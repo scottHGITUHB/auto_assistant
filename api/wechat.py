@@ -51,9 +51,9 @@ async def wechat_webhook_receive(request: Request):
             if "@助手" in content:
                 # 提取问题
                 question = content.replace("@助手", "").strip()
-                # 获取AI回答
+                # 获取AI回答（异步）
                 from services import ai_service
-                answer = ai_service.get_ai_answer(question)
+                answer = await ai_service.get_ai_answer(question, message.from_user)
                 # 回复消息
                 reply = create_reply(answer, message)
                 return reply.render()

@@ -8,7 +8,17 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock  # 用于容器内重启服务
     environment:
       - TZ=Asia/Shanghai
       - LOG_LEVEL=INFO
+      - GITHUB_REPO=https://github.com/scottHGITUHB/auto_assistant.git
+      - GITHUB_BRANCH=master
+      - UPDATE_INTERVAL=6  # 每6小时检查一次更新
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

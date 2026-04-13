@@ -13,3 +13,5 @@ wechatpy
 requests
 lxml
 beautifulsoup4
+aiohttp
+GitPython

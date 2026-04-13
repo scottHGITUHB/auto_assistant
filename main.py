@@ -1,21 +1,59 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import uvicorn
+import logging
+import os
+from dotenv import load_dotenv
 
 from api import admin, wechat, pushes, crawlers, memories, reminders, finance
 from services.scheduler import scheduler
 from models import db
 
+# 加载环境变量
+load_dotenv()
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("logs/app.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时执行
-    db.init_db()
-    scheduler.start()
-    yield
-    # 关闭时执行
-    scheduler.stop()
+    try:
+        logger.info("正在初始化数据库...")
+        db.init_db()
+        logger.info("数据库初始化完成")
+        
+        logger.info("正在启动调度器...")
+        scheduler.start()
+        logger.info("调度器启动完成")
+        
+        # 启动时检查更新
+        try:
+            from update import check_update_on_start
+            await check_update_on_start()
+        except Exception as e:
+            logger.warning(f"启动时检查更新失败: {e}")
+        
+        yield
+        
+        # 关闭时执行
+        logger.info("正在停止调度器...")
+        scheduler.stop()
+        logger.info("调度器停止完成")
+    except Exception as e:
+        logger.error(f"服务生命周期管理失败: {e}")
+        raise
 
 
 app = FastAPI(
@@ -34,6 +72,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 全局异常捕获
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"全局异常: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "服务器内部错误", "message": str(exc)}
+    )
+
 # 注册路由
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(wechat.router, prefix="/api/wechat", tags=["wechat"])
@@ -49,5 +96,23 @@ async def root():
     return {"message": "企业微信机器人API服务运行中"}
 
 
+@app.get("/health")
+async def health_check():
+    """健康检查接口"""
+    return {"status": "healthy", "service": "企业微信机器人API"}
+
+
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    try:
+        logger.info("正在启动企业微信机器人API服务...")
+        uvicorn.run(
+            "main:app", 
+            host="0.0.0.0", 
+            port=8000, 
+            reload=False,
+            log_config=None  # 使用自定义日志配置
+        )
+    except Exception as e:
+        logger.error(f"服务启动失败: {e}")
+        raise
+
