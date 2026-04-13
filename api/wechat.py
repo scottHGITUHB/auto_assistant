@@ -51,11 +51,19 @@ async def wechat_webhook_receive(request: Request):
             if "@助手" in content:
                 # 提取问题
                 question = content.replace("@助手", "").strip()
-                # 获取AI回答（异步）
-                from services import ai_service
-                answer = await ai_service.get_ai_answer(question, message.from_user)
-                # 回复消息
-                reply = create_reply(answer, message)
+                
+                # 将AI请求放入队列，后台处理
+                from services.queue_service import queue_service
+                await queue_service.add_task({
+                    "type": "ai_request",
+                    "question": question,
+                    "user_id": message.from_user,
+                    "message_id": message.id,
+                    "message": message
+                })
+                
+                # 立即返回成功，不阻塞
+                reply = create_reply("收到您的问题，正在处理中...", message)
                 return reply.render()
             
             # 处理记忆功能

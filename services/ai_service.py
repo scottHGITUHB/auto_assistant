@@ -1,8 +1,8 @@
 import os
 import asyncio
-from playwright.async_api import async_playwright
 from dotenv import load_dotenv
 import logging
+from .browser_manager import browser_manager
 
 load_dotenv()
 
@@ -15,77 +15,112 @@ class AIService:
         self.ai_web_url = os.getenv("AI_WEB_URL", "https://chat.openai.com")
         self.ai_username = os.getenv("AI_USERNAME")
         self.ai_password = os.getenv("AI_PASSWORD")
-        self.ai_timeout = int(os.getenv("AI_TIMEOUT", "15000"))  # 改为15秒超时
+        self.ai_timeout = int(os.getenv("AI_TIMEOUT", "30000"))  # 改为30秒超时
         self.session_cache = {}  # 内存级会话缓存
         self.semaphore = asyncio.Semaphore(5)  # 并发限制，最多5个并行请求
     
+    async def extract_answer(self, page):
+        """使用多策略提取AI回答"""
+        selectors = [
+            ".markdown",
+            ".message",
+            "[data-message-author-role='assistant']",
+            ".chat-message-content",
+            ".response"
+        ]
+        
+        for selector in selectors:
+            try:
+                element = await page.query_selector(selector)
+                if element:
+                    answer = await element.inner_text()
+                    if answer.strip():
+                        return answer
+            except Exception as e:
+                logger.warning(f"使用选择器 {selector} 提取回答失败: {e}")
+        
+        raise Exception("所有选择器都提取失败")
+    
+    async def run_ai(self, question, user_id=None):
+        """运行AI请求"""
+        page = await browser_manager.get_page()
+        
+        try:
+            # 访问AI网站
+            await page.goto(self.ai_web_url, timeout=self.ai_timeout)
+            
+            # 登录流程
+            if self.ai_username and self.ai_password:
+                try:
+                    # 点击登录按钮
+                    await page.click("button:has-text('Log in')", timeout=10000)
+                    
+                    # 输入用户名
+                    await page.fill("input[type='email']", self.ai_username)
+                    await page.click("button:has-text('Continue')", timeout=10000)
+                    
+                    # 输入密码
+                    await page.fill("input[type='password']", self.ai_password)
+                    await page.click("button:has-text('Log in')", timeout=10000)
+                    
+                    # 等待登录完成
+                    await page.wait_for_load_state("networkidle", timeout=self.ai_timeout)
+                except Exception as login_error:
+                    logger.warning(f"登录失败，使用游客模式: {login_error}")
+            
+            # 处理会话上下文
+            if user_id and user_id in self.session_cache:
+                # 恢复会话历史
+                history = self.session_cache[user_id]
+                # 这里可以根据具体AI网站的API恢复会话
+            
+            # 输入问题
+            await page.fill("textarea", question)
+            await page.press("textarea", "Enter")
+            
+            # 等待回答生成
+            await asyncio.sleep(2)  # 等待输入完成
+            
+            # 尝试提取回答
+            answer = await self.extract_answer(page)
+            
+            # 更新会话缓存
+            if user_id:
+                self.session_cache[user_id] = {
+                    "question": question,
+                    "answer": answer,
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+            
+            return answer
+        except Exception as e:
+            logger.error(f"AI处理失败: {e}")
+            raise
+    
     async def get_ai_answer(self, question, user_id=None):
+        """获取AI回答，支持超时和重试"""
         # 使用并发锁限制并行请求
         async with self.semaphore:
-            try:
-                # 超时控制
-                async with asyncio.timeout(self.ai_timeout / 1000):
-                    async with async_playwright() as p:
-                        browser = await p.chromium.launch(headless=True)
-                        try:
-                            page = await browser.new_page()
-                            
-                            # 访问AI网站
-                            await page.goto(self.ai_web_url, timeout=self.ai_timeout)
-                            
-                            # 登录流程
-                            if self.ai_username and self.ai_password:
-                                try:
-                                    # 点击登录按钮
-                                    await page.click("button:has-text('Log in')", timeout=5000)
-                                    
-                                    # 输入用户名
-                                    await page.fill("input[type='email']", self.ai_username)
-                                    await page.click("button:has-text('Continue')", timeout=5000)
-                                    
-                                    # 输入密码
-                                    await page.fill("input[type='password']", self.ai_password)
-                                    await page.click("button:has-text('Log in')", timeout=5000)
-                                    
-                                    # 等待登录完成
-                                    await page.wait_for_load_state("networkidle", timeout=self.ai_timeout)
-                                except Exception as login_error:
-                                    logger.warning(f"登录失败，使用游客模式: {login_error}")
-                            
-                            # 处理会话上下文
-                            if user_id and user_id in self.session_cache:
-                                # 恢复会话历史
-                                history = self.session_cache[user_id]
-                                # 这里可以根据具体AI网站的API恢复会话
-                            
-                            # 输入问题
-                            await page.fill("textarea", question)
-                            await page.press("textarea", "Enter")
-                            
-                            # 等待回答生成
-                            await page.wait_for_selector(".markdown", timeout=self.ai_timeout)
-                            
-                            # 获取回答
-                            answer = await page.inner_text(".markdown")
-                            
-                            # 更新会话缓存
-                            if user_id:
-                                self.session_cache[user_id] = {
-                                    "question": question,
-                                    "answer": answer,
-                                    "timestamp": asyncio.get_event_loop().time()
-                                }
-                            
-                            return answer
-                        finally:
-                            # 强制关闭浏览器，释放资源
-                            await browser.close()
-            except asyncio.TimeoutError:
-                logger.error("AI回答超时")
-                return "AI回答超时，请稍后再试"
-            except Exception as e:
-                logger.error(f"获取AI回答失败: {str(e)}")
-                return f"获取AI回答失败，请稍后再试"
+            max_retries = 2
+            retry_count = 0
+            
+            while retry_count <= max_retries:
+                try:
+                    # 超时控制
+                    async with asyncio.timeout(self.ai_timeout / 1000):
+                        answer = await self.run_ai(question, user_id)
+                        logger.info(f"AI回答成功，长度: {len(answer)}")
+                        return answer
+                except asyncio.TimeoutError:
+                    retry_count += 1
+                    if retry_count > max_retries:
+                        logger.error("AI回答超时，已达到最大重试次数")
+                        return "AI回答超时，请稍后重试"
+                    logger.warning(f"AI回答超时，正在重试 ({retry_count}/{max_retries})...")
+                    await asyncio.sleep(2)  # 等待2秒后重试
+                except Exception as e:
+                    logger.error(f"获取AI回答失败: {str(e)}")
+                    return f"获取AI回答失败，请稍后再试"
     
     def clear_expired_sessions(self):
         """清理过期的会话缓存（超过1小时）"""
@@ -110,4 +145,3 @@ async def cleanup_sessions():
 import asyncio
 loop = asyncio.get_event_loop()
 loop.create_task(cleanup_sessions())
-

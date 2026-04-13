@@ -38,6 +38,11 @@ async def lifespan(app: FastAPI):
         scheduler.start()
         logger.info("调度器启动完成")
         
+        logger.info("正在启动队列服务...")
+        from services.queue_service import queue_service
+        await queue_service.start_worker()
+        logger.info("队列服务启动完成")
+        
         # 启动时检查更新
         try:
             from update import check_update_on_start

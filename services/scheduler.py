@@ -6,7 +6,6 @@ from services import crawler_service, wechat_service
 import asyncio
 import logging
 import os
-import fcntl
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -43,22 +42,39 @@ class Scheduler:
             # 确保锁文件所在目录存在
             os.makedirs(os.path.dirname(self.lock_file), exist_ok=True)
             
+            # 尝试打开锁文件，如果文件已存在且被占用，则获取锁失败
+            if os.path.exists(self.lock_file):
+                # 检查锁文件是否过期（超过1小时）
+                try:
+                    import time
+                    if time.time() - os.path.getmtime(self.lock_file) > 3600:
+                        os.remove(self.lock_file)
+                        logger.info("发现过期锁文件，已删除")
+                    else:
+                        logger.warning("锁文件已存在，可能已有其他实例在运行")
+                        return False
+                except Exception as e:
+                    logger.warning(f"检查锁文件失败: {e}")
+                    return False
+            
+            # 创建锁文件
             self.lock = open(self.lock_file, 'w')
-            fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.lock.write(f"{os.getpid()}")
             self.lock.flush()
+            logger.info("获取锁成功")
             return True
         except Exception as e:
-            logger.warning(f"获取锁失败，可能已有其他实例在运行: {e}")
+            logger.warning(f"获取锁失败: {e}")
             return False
     
     def _release_lock(self):
         """释放单机锁"""
         try:
             if hasattr(self, 'lock') and self.lock:
-                fcntl.flock(self.lock, fcntl.LOCK_UN)
                 self.lock.close()
-                os.remove(self.lock_file)
+                if os.path.exists(self.lock_file):
+                    os.remove(self.lock_file)
+                logger.info("释放锁成功")
         except Exception as e:
             logger.warning(f"释放锁失败: {e}")
     
@@ -91,12 +107,16 @@ class Scheduler:
             logger.error(f"获取爬虫任务失败: {e}")
     
     def schedule_reminder_tasks(self):
+        """从数据库加载并调度提醒任务"""
         try:
             reminders = db.session.query(Reminder).filter_by(is_done=False).all()
             for reminder in reminders:
                 try:
-                    remind_time = datetime.strptime(reminder.remind_at, "%Y-%m-%d %H:%M:%S")
-                    if remind_time > datetime.now():
+                    # 统一使用UTC时间
+                    from datetime import timezone
+                    remind_time = datetime.strptime(reminder.remind_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    now = datetime.now(timezone.utc)
+                    if remind_time > now:
                         self.scheduler.add_job(
                             self.send_reminder,
                             "date",
