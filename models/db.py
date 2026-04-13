@@ -99,6 +99,15 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
 
+def get_db():
+    """为每个请求创建新的数据库会话"""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
 class Database:
     def __init__(self):
         self.session = SessionLocal()

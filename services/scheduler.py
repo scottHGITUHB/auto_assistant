@@ -88,15 +88,19 @@ class Scheduler:
         # 调度自动更新任务
         self.schedule_update_task()
     
+    def _run_async_task(self, async_func, *args, **kwargs):
+        """运行异步任务的包装函数"""
+        asyncio.create_task(async_func(*args, **kwargs))
+    
     def schedule_crawler_tasks(self):
         try:
             crawler_tasks = db.session.query(CrawlerTask).filter_by(is_active=True).all()
             for task in crawler_tasks:
                 try:
                     self.scheduler.add_job(
-                        crawler_service.run_crawler,
+                        self._run_async_task,
                         CronTrigger.from_crontab(task.cron_expr),
-                        args=[task],
+                        args=[crawler_service.run_crawler, task],
                         id=f"crawler_{task.id}",
                         replace_existing=True
                     )
@@ -112,16 +116,27 @@ class Scheduler:
             reminders = db.session.query(Reminder).filter_by(is_done=False).all()
             for reminder in reminders:
                 try:
-                    # 统一使用UTC时间
+                    # 处理时区，将本地时间（Asia/Shanghai）转换为UTC时间
                     from datetime import timezone
-                    remind_time = datetime.strptime(reminder.remind_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    try:
+                        from pytz import timezone as pytz_timezone
+                        # 假设数据库中存储的是上海时区的时间
+                        local_tz = pytz_timezone('Asia/Shanghai')
+                        # 解析时间字符串并添加时区信息
+                        remind_time_local = local_tz.localize(datetime.strptime(reminder.remind_at, "%Y-%m-%d %H:%M:%S"))
+                        # 转换为UTC时间
+                        remind_time = remind_time_local.astimezone(timezone.utc)
+                    except ImportError:
+                        # 如果没有安装pytz，使用简单的时区处理
+                        remind_time = datetime.strptime(reminder.remind_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    
                     now = datetime.now(timezone.utc)
                     if remind_time > now:
                         self.scheduler.add_job(
-                            self.send_reminder,
+                            self._run_async_task,
                             "date",
                             run_date=remind_time,
-                            args=[reminder],
+                            args=[self.send_reminder, reminder],
                             id=f"reminder_{reminder.id}",
                             replace_existing=True
                         )
@@ -139,9 +154,9 @@ class Scheduler:
                     # 解析推送时间，格式如 "08:30"
                     hour, minute = map(int, push.push_time.split(":"))
                     self.scheduler.add_job(
-                        self.send_push,
+                        self._run_async_task,
                         CronTrigger(hour=hour, minute=minute),
-                        args=[push],
+                        args=[self.send_push, push],
                         id=f"push_{push.id}",
                         replace_existing=True
                     )
@@ -157,8 +172,9 @@ class Scheduler:
             # 默认每6小时检查一次更新
             update_interval = int(os.getenv("UPDATE_INTERVAL", "6"))
             self.scheduler.add_job(
-                self.check_for_updates,
+                self._run_async_task,
                 CronTrigger(hour=f"*/{update_interval}"),
+                args=[self.check_for_updates],
                 id="auto_update",
                 replace_existing=True
             )

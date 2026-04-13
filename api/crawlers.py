@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from models import db, CrawlerTask
+from sqlalchemy.orm import Session
+from models import db, CrawlerTask, get_db
 from services import crawler_service
 
 router = APIRouter()
@@ -27,8 +28,8 @@ class CrawlerTaskResponse(BaseModel):
 
 
 @router.get("", response_model=List[CrawlerTaskResponse])
-async def get_crawlers():
-    crawlers = db.session.query(CrawlerTask).all()
+async def get_crawlers(session: Session = Depends(get_db)):
+    crawlers = session.query(CrawlerTask).all()
     return [
         CrawlerTaskResponse(
             id=crawler.id,
@@ -45,7 +46,7 @@ async def get_crawlers():
 
 
 @router.post("", response_model=CrawlerTaskResponse)
-async def create_crawler(crawler: CrawlerTaskCreate):
+async def create_crawler(crawler: CrawlerTaskCreate, session: Session = Depends(get_db)):
     new_crawler = CrawlerTask(
         name=crawler.name,
         url=crawler.url,
@@ -53,9 +54,9 @@ async def create_crawler(crawler: CrawlerTaskCreate):
         cron_expr=crawler.cron_expr,
         is_active=crawler.is_active
     )
-    db.session.add(new_crawler)
-    db.session.commit()
-    db.session.refresh(new_crawler)
+    session.add(new_crawler)
+    session.commit()
+    session.refresh(new_crawler)
     return CrawlerTaskResponse(
         id=new_crawler.id,
         name=new_crawler.name,
@@ -69,10 +70,10 @@ async def create_crawler(crawler: CrawlerTaskCreate):
 
 
 @router.post("/{crawler_id}/run")
-async def run_crawler(crawler_id: int):
-    crawler = db.session.query(CrawlerTask).filter_by(id=crawler_id).first()
+async def run_crawler(crawler_id: int, session: Session = Depends(get_db)):
+    crawler = session.query(CrawlerTask).filter_by(id=crawler_id).first()
     if not crawler:
         raise HTTPException(status_code=404, detail="爬虫任务不存在")
     
-    result = crawler_service.run_crawler(crawler)
+    result = await crawler_service.run_crawler(crawler)
     return result

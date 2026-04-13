@@ -6,12 +6,21 @@ from dotenv import load_dotenv
 from wechatpy import parse_message, create_reply
 from wechatpy.utils import check_signature
 from wechatpy.exceptions import InvalidSignatureException
+from wechatpy.crypto import WeChatCrypto
 from services import wechat_service
 from models import db
 
 load_dotenv()
 
 router = APIRouter()
+
+# 企业微信加密配置
+token = os.getenv("WECHAT_TOKEN", "your_token")
+aes_key = os.getenv("WECHAT_ENCODING_AES_KEY", "")
+corp_id = os.getenv("WECHAT_CORPID", "")
+
+# 创建加密实例
+crypto = WeChatCrypto(token, aes_key, corp_id) if aes_key else None
 
 
 class SendMessageRequest(BaseModel):
@@ -40,8 +49,24 @@ async def wechat_webhook_verify(request: Request):
 async def wechat_webhook_receive(request: Request):
     body = await request.body()
     try:
-        # 解析企业微信消息
-        message = parse_message(body)
+        # 获取请求参数
+        signature = request.query_params.get("signature")
+        timestamp = request.query_params.get("timestamp")
+        nonce = request.query_params.get("nonce")
+        
+        # 解析消息
+        if crypto:
+            # 解密消息
+            decrypted_xml = crypto.decrypt_message(
+                body.decode('utf-8'),
+                signature,
+                timestamp,
+                nonce
+            )
+            message = parse_message(decrypted_xml)
+        else:
+            # 未配置加密，直接解析
+            message = parse_message(body)
         
         # 处理不同类型的消息
         if message.type == "text":
@@ -122,7 +147,7 @@ async def wechat_webhook_receive(request: Request):
 
 @router.post("/send")
 async def wechat_send_message(request: SendMessageRequest):
-    result = wechat_service.send_message(
+    result = await wechat_service.send_message(
         message=request.message,
         to=request.to,
         msgtype=request.msgtype

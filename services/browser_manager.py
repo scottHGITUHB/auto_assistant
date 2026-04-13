@@ -20,7 +20,8 @@ class BrowserManager:
         if not self._initialized:
             self.browser = None
             self.context = None
-            self.page = None
+            self.page_pool = []  # 页面池
+            self.semaphore = asyncio.Semaphore(3)  # 限制并发数
             self._initialized = True
     
     async def initialize(self):
@@ -44,24 +45,39 @@ class BrowserManager:
                 raise
     
     async def get_page(self):
-        """获取页面实例，按需创建"""
-        if not self.browser:
-            await self.initialize()
-        
-        if not self.context:
-            self.context = await self.browser.new_context()
-        
-        if not self.page:
-            self.page = await self.context.new_page()
-        
-        return self.page
+        """获取页面实例，从池中获取或创建新的"""
+        async with self.semaphore:
+            if not self.browser:
+                await self.initialize()
+            
+            if not self.context:
+                self.context = await self.browser.new_context()
+            
+            # 从池中获取页面
+            if self.page_pool:
+                return self.page_pool.pop()
+            
+            # 创建新页面
+            page = await self.context.new_page()
+            logger.info("创建新页面")
+            return page
+    
+    async def release_page(self, page):
+        """释放页面，放回池中"""
+        if page:
+            self.page_pool.append(page)
+            logger.info(f"页面已释放，池中页面数: {len(self.page_pool)}")
     
     async def close(self):
         """关闭浏览器，释放资源"""
         try:
-            if self.page:
-                await self.page.close()
-                self.page = None
+            # 关闭所有页面
+            for page in self.page_pool:
+                try:
+                    await page.close()
+                except Exception as e:
+                    logger.error(f"关闭页面失败: {e}")
+            self.page_pool = []
             
             if self.context:
                 await self.context.close()
