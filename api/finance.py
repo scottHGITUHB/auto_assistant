@@ -31,6 +31,7 @@ class FinanceStatsResponse(BaseModel):
     total_expense: float
     balance: float
     category_stats: dict
+    category_expenses: dict
 
 
 @router.get("", response_model=List[FinanceRecordResponse])
@@ -90,9 +91,17 @@ async def get_finance_stats():
             category_stats[record.category] = {"income": 0, "expense": 0}
         category_stats[record.category][record.type] += record.amount
     
+    # 转换格式以匹配前端
+    category_expenses = {}
+    category_income = {}
+    for cat, stats in category_stats.items():
+        category_expenses[cat] = stats["expense"]
+        category_income[cat] = stats["income"]
+    
     return FinanceStatsResponse(
         total_income=total_income,
         total_expense=total_expense,
         balance=balance,
-        category_stats=category_stats
+        category_stats=category_stats,
+        category_expenses=category_expenses
     )

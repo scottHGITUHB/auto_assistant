@@ -164,7 +164,6 @@ async def cleanup_sessions():
         await asyncio.sleep(3600)  # 每小时清理一次
         ai_service.clear_expired_sessions()
 
-# 启动清理任务
-import asyncio
-loop = asyncio.get_event_loop()
-loop.create_task(cleanup_sessions())
+# 启动清理任务的函数，供main.py调用
+async def start_cleanup_task():
+    asyncio.create_task(cleanup_sessions())

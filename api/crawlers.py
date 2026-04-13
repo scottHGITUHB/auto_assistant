@@ -75,5 +75,5 @@ async def run_crawler(crawler_id: int, session: Session = Depends(get_db)):
     if not crawler:
         raise HTTPException(status_code=404, detail="爬虫任务不存在")
     
-    result = await crawler_service.run_crawler(crawler)
+    result = await crawler_service.run_crawler(crawler, session)
     return result

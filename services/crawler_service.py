@@ -18,7 +18,7 @@ class CrawlerService:
         """计算内容的哈希值"""
         return hashlib.md5(content.encode()).hexdigest()
     
-    async def run_crawler(self, crawler_task):
+    async def run_crawler(self, crawler_task, session=None):
         try:
             logger.info(f"开始执行爬虫任务: {crawler_task.name}")
             
@@ -33,9 +33,12 @@ class CrawlerService:
                 logger.info(f"爬虫结果未变化，跳过推送: {crawler_task.name}")
                 return {"status": "success", "result": result, "message": "结果未变化，跳过推送"}
             
+            # 使用传入的session或全局session
+            db_session = session or db.session
+            
             # 更新爬虫任务结果
             crawler_task.last_result = result
-            db.session.commit()
+            db_session.commit()
             
             # 发送推送
             await wechat_service.send_message(result, msgtype="markdown")

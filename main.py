@@ -43,6 +43,14 @@ async def lifespan(app: FastAPI):
         await queue_service.start_worker()
         logger.info("队列服务启动完成")
         
+        # 启动AI服务的清理任务
+        try:
+            from services.ai_service import start_cleanup_task
+            await start_cleanup_task()
+            logger.info("AI服务清理任务启动完成")
+        except Exception as e:
+            logger.warning(f"启动AI服务清理任务失败: {e}")
+        
         # 启动时检查更新
         try:
             from update import check_update_on_start
@@ -105,6 +113,33 @@ async def root():
 async def health_check():
     """健康检查接口"""
     return {"status": "healthy", "service": "企业微信机器人API"}
+
+
+@app.get("/api/dashboard/stats")
+async def dashboard_stats():
+    """仪表盘统计数据"""
+    from datetime import datetime
+    from models import db, PushContent, MessageLog
+    
+    try:
+        # 统计今日推送数
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # 这里可以添加具体的统计逻辑
+        # 例如：统计今日推送数量、消息处理数量等
+        
+        return {
+            "today_pushes": 0,
+            "message_stats": 0,
+            "task_status": "正常"
+        }
+    except Exception as e:
+        logger.error(f"获取仪表盘统计数据失败: {e}")
+        return {
+            "today_pushes": 0,
+            "message_stats": 0,
+            "task_status": "正常"
+        }
 
 
 if __name__ == "__main__":

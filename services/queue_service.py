@@ -11,6 +11,8 @@ class QueueService:
     def __init__(self):
         self.task_queue = asyncio.Queue()
         self.processed_ids = set()  # 消息去重
+        self.processed_timestamps = {}  # 添加时间戳记录
+        self.id_cleanup_interval = 86400  # 24小时
         self.last_call = {}  # 限流
         self.worker_running = False
     
@@ -77,7 +79,9 @@ class QueueService:
             return False
         
         if message_id:
+            import time
             self.processed_ids.add(message_id)
+            self.processed_timestamps[message_id] = time.time()
             # 定期清理过期的消息ID（保留24小时）
             self._cleanup_processed_ids()
         
@@ -101,9 +105,17 @@ class QueueService:
         return True
     
     def _cleanup_processed_ids(self):
-        """清理过期的处理消息ID"""
-        # 这里可以添加清理逻辑，例如保留最近24小时的消息ID
-        pass
+        """清理超过24小时的消息ID"""
+        import time
+        now = time.time()
+        expired = [msg_id for msg_id, ts in self.processed_timestamps.items()
+                   if now - ts > self.id_cleanup_interval]
+        for msg_id in expired:
+            self.processed_ids.discard(msg_id)
+            if msg_id in self.processed_timestamps:
+                del self.processed_timestamps[msg_id]
+        if expired:
+            logger.info(f"清理了{len(expired)}个过期的消息ID")
 
 # 创建全局实例
 queue_service = QueueService()

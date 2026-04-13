@@ -80,6 +80,10 @@ class WeChatService:
         # 处理特殊字符
         message = self.escape_special_chars(message)
         
+        # Webhook模式不支持指定发送对象
+        if self.webhook_key and to:
+            logger.warning("Webhook模式不支持指定发送对象，将发送到webhook绑定的群")
+        
         for retry in range(max_retries):
             try:
                 session = await self.get_session()

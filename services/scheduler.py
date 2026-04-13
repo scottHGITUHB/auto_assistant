@@ -21,7 +21,9 @@ class Scheduler:
         if self._acquire_lock():
             try:
                 self.scheduler.start()
-                self.schedule_all_tasks()
+                # 执行异步的schedule_all_tasks
+                import asyncio
+                asyncio.create_task(self.schedule_all_tasks())
                 logger.info("调度器启动成功")
             except Exception as e:
                 logger.error(f"调度器启动失败: {e}")
@@ -78,13 +80,13 @@ class Scheduler:
         except Exception as e:
             logger.warning(f"释放锁失败: {e}")
     
-    def schedule_all_tasks(self):
+    async def schedule_all_tasks(self):
         # 调度爬虫任务
-        self.schedule_crawler_tasks()
+        await self.schedule_crawler_tasks()
         # 调度提醒任务
-        self.schedule_reminder_tasks()
+        await self.schedule_reminder_tasks()
         # 调度推送任务
-        self.schedule_push_tasks()
+        await self.schedule_push_tasks()
         # 调度自动更新任务
         self.schedule_update_task()
     
@@ -92,9 +94,14 @@ class Scheduler:
         """运行异步任务的包装函数"""
         asyncio.create_task(async_func(*args, **kwargs))
     
-    def schedule_crawler_tasks(self):
+    async def schedule_crawler_tasks(self):
         try:
-            crawler_tasks = db.session.query(CrawlerTask).filter_by(is_active=True).all()
+            # 使用同步session但在线程池中执行
+            def get_tasks():
+                return db.session.query(CrawlerTask).filter_by(is_active=True).all()
+            
+            loop = asyncio.get_event_loop()
+            crawler_tasks = await loop.run_in_executor(None, get_tasks)
             for task in crawler_tasks:
                 try:
                     self.scheduler.add_job(
@@ -110,10 +117,16 @@ class Scheduler:
         except Exception as e:
             logger.error(f"获取爬虫任务失败: {e}")
     
-    def schedule_reminder_tasks(self):
+    async def schedule_reminder_tasks(self):
         """从数据库加载并调度提醒任务"""
         try:
-            reminders = db.session.query(Reminder).filter_by(is_done=False).all()
+            # 使用同步session但在线程池中执行
+            def get_reminders():
+                return db.session.query(Reminder).filter_by(is_done=False).all()
+            
+            loop = asyncio.get_event_loop()
+            reminders = await loop.run_in_executor(None, get_reminders)
+            
             for reminder in reminders:
                 try:
                     # 处理时区，将本地时间（Asia/Shanghai）转换为UTC时间
@@ -146,9 +159,15 @@ class Scheduler:
         except Exception as e:
             logger.error(f"获取提醒任务失败: {e}")
     
-    def schedule_push_tasks(self):
+    async def schedule_push_tasks(self):
         try:
-            push_contents = db.session.query(PushContent).filter_by(is_active=True).all()
+            # 使用同步session但在线程池中执行
+            def get_push_contents():
+                return db.session.query(PushContent).filter_by(is_active=True).all()
+            
+            loop = asyncio.get_event_loop()
+            push_contents = await loop.run_in_executor(None, get_push_contents)
+            
             for push in push_contents:
                 try:
                     # 解析推送时间，格式如 "08:30"
