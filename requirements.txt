@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+playwright
+apscheduler
+python-dotenv
+bcrypt
+psycopg2-binary
+sqlalchemy
+python-dateutil
+wechatpy
+requests
+lxml
+beautifulsoup4

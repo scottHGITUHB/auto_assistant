@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业微信机器人管理系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>企业微信机器人管理系统</h1>
+        </header>
+        
+        <nav>
+            <ul>
+                <li><a href="#dashboard">仪表盘</a></li>
+                <li><a href="#pushes">推送管理</a></li>
+                <li><a href="#crawlers">爬虫管理</a></li>
+                <li><a href="#memories">记忆管理</a></li>
+                <li><a href="#reminders">提醒管理</a></li>
+                <li><a href="#finance">理财记录</a></li>
+                <li><a href="#settings">配置中心</a></li>
+            </ul>
+        </nav>
+        
+        <main>
+            <section id="dashboard">
+                <h2>仪表盘</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>今日推送</h3>
+                        <p id="today-pushes">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>消息统计</h3>
+                        <p id="message-stats">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>任务运行</h3>
+                        <p id="task-status">正常</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="pushes" style="display: none;">
+                <h2>推送管理</h2>
+                <button id="add-push">添加推送</button>
+                <table id="pushes-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>标题</th>
+                            <th>推送时间</th>
+                            <th>目标群聊</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="crawlers" style="display: none;">
+                <h2>爬虫管理</h2>
+                <button id="add-crawler">添加爬虫</button>
+                <table id="crawlers-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>名称</th>
+                            <th>URL</th>
+                            <th>选择器</th>
+                            <th> cron 表达式</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="memories" style="display: none;">
+                <h2>记忆管理</h2>
+                <table id="memories-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户ID</th>
+                            <th>内容</th>
+                            <th>分类</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="reminders" style="display: none;">
+                <h2>提醒管理</h2>
+                <table id="reminders-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户ID</th>
+                            <th>内容</th>
+                            <th>提醒时间</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="finance" style="display: none;">
+                <h2>理财记录</h2>
+                <button id="add-finance">添加记录</button>
+                <table id="finance-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户ID</th>
+                            <th>类型</th>
+                            <th>金额</th>
+                            <th>分类</th>
+                            <th>记录日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+                <h3>统计报表</h3>
+                <div id="finance-stats">
+                    <!-- 统计数据将通过JavaScript动态填充 -->
+                </div>
+            </section>
+            
+            <section id="settings" style="display: none;">
+                <h2>配置中心</h2>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label>企业微信 CorpID</label>
+                        <input type="text" id="wechat-corpid" placeholder="请输入 CorpID">
+                    </div>
+                    <div class="form-group">
+                        <label>企业微信 Secret</label>
+                        <input type="text" id="wechat-secret" placeholder="请输入 Secret">
+                    </div>
+                    <div class="form-group">
+                        <label>企业微信 AgentID</label>
+                        <input type="text" id="wechat-agentid" placeholder="请输入 AgentID">
+                    </div>
+                    <div class="form-group">
+                        <label>企业微信 Webhook Key</label>
+                        <input type="text" id="wechat-webhook-key" placeholder="请输入 Webhook Key">
+                    </div>
+                    <button type="submit">保存配置</button>
+                </form>
+            </section>
+        </main>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

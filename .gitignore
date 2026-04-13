@@ -1,0 +1,24 @@
+# 忽略Python编译文件
+__pycache__/
+*.pyc
+
+# 忽略数据文件
+data/
+
+# 忽略日志文件
+logs/
+
+# 忽略环境变量文件
+.env
+
+# 忽略Docker相关文件
+Dockerfile
+.dockerignore
+
+# 忽略IDE相关文件
+.vscode/
+.idea/
+
+# 忽略系统文件
+Thumbs.db
+.DS_Store
