@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import uvicorn
 import logging
@@ -94,7 +95,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"error": "服务器内部错误", "message": str(exc)}
     )
 
-# 注册路由
+# 注册API路由
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(wechat.router, prefix="/api/wechat", tags=["wechat"])
 app.include_router(pushes.router, prefix="/api/pushes", tags=["pushes"])
@@ -103,12 +104,7 @@ app.include_router(memories.router, prefix="/api/memories", tags=["memories"])
 app.include_router(reminders.router, prefix="/api/reminders", tags=["reminders"])
 app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
 
-
-@app.get("/")
-async def root():
-    return {"message": "企业微信机器人API服务运行中"}
-
-
+# 注册其他路由
 @app.get("/health")
 async def health_check():
     """健康检查接口"""
@@ -149,6 +145,9 @@ async def dashboard_stats():
         }
     finally:
         session.close()
+
+# 挂载静态文件目录（最后挂载，确保API路由优先）
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 
 if __name__ == "__main__":

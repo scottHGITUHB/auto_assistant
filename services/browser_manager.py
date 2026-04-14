@@ -31,7 +31,7 @@ class BrowserManager:
                 logger.info("正在启动浏览器...")
                 playwright = await async_playwright().start()
                 self.browser = await playwright.chromium.launch(
-                    headless=True,
+                    headless=False,
                     args=[
                         "--no-sandbox",
                         "--disable-dev-shm-usage",

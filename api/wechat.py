@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+import logging
 from wechatpy import parse_message, create_reply
 from wechatpy.utils import check_signature
 from wechatpy.exceptions import InvalidSignatureException
@@ -13,6 +14,10 @@ from sqlalchemy.orm import Session
 
 load_dotenv()
 
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # 企业微信加密配置
@@ -21,7 +26,12 @@ aes_key = os.getenv("WECHAT_ENCODING_AES_KEY", "")
 corp_id = os.getenv("WECHAT_CORPID", "")
 
 # 创建加密实例
-crypto = WeChatCrypto(token, aes_key, corp_id) if aes_key else None
+crypto = None
+if aes_key:
+    try:
+        crypto = WeChatCrypto(token, aes_key, corp_id)
+    except Exception as e:
+        logger.warning(f"创建WeChatCrypto失败: {e}，将使用非加密模式")
 
 
 class SendMessageRequest(BaseModel):

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     def __init__(self):
-        self.ai_web_url = os.getenv("AI_WEB_URL", "https://chat.openai.com")
+        self.ai_web_url = os.getenv("AI_WEB_URL", "https://kimi.moonshot.cn/chat")
         self.ai_username = os.getenv("AI_USERNAME")
         self.ai_password = os.getenv("AI_PASSWORD")
         self.ai_timeout = int(os.getenv("AI_TIMEOUT", "30000"))  # 改为30秒超时
@@ -37,11 +37,15 @@ class AIService:
     async def extract_answer(self, page):
         """使用多策略提取AI回答"""
         selectors = [
+            ".chat-content",
+            ".kimi-message",
             ".markdown",
             ".message",
             "[data-message-author-role='assistant']",
             ".chat-message-content",
-            ".response"
+            ".response",
+            ".ai-answer",
+            ".answer-content"
         ]
         
         for selector in selectors:
@@ -62,42 +66,165 @@ class AIService:
         answer = None
         
         try:
+            logger.info(f"访问AI网站: {self.ai_web_url}")
             # 访问AI网站
             await page.goto(self.ai_web_url, timeout=self.ai_timeout)
             
-            # 登录流程
-            if self.ai_username and self.ai_password:
-                try:
-                    # 点击登录按钮
-                    await page.click("button:has-text('Log in')", timeout=10000)
-                    
-                    # 输入用户名
-                    await page.fill("input[type='email']", self.ai_username)
-                    await page.click("button:has-text('Continue')", timeout=10000)
-                    
-                    # 输入密码
-                    await page.fill("input[type='password']", self.ai_password)
-                    await page.click("button:has-text('Log in')", timeout=10000)
-                    
-                    # 等待登录完成
-                    await page.wait_for_load_state("networkidle", timeout=self.ai_timeout)
-                except Exception as login_error:
-                    logger.warning(f"登录失败，使用游客模式: {login_error}")
+            # 等待页面加载完成
+            logger.info("等待页面加载完成...")
+            await page.wait_for_load_state("networkidle", timeout=self.ai_timeout)
             
-            # 处理会话上下文
-            if user_id and user_id in self.session_cache:
-                # 恢复会话历史
-                history = self.session_cache[user_id]
-                # 这里可以根据具体AI网站的API恢复会话
+            # 打印页面标题
+            title = await page.title()
+            logger.info(f"页面标题: {title}")
+            
+            # 检查是否需要登录
+            logger.info("检查是否需要登录...")
+            try:
+                # 首先尝试点击左下角用户头像（根据Kimi AI的界面）
+                logger.info("尝试点击左下角用户头像...")
+                user_avatar_selectors = [
+                    ".user-avatar",  # 用户头像
+                    "[class*='avatar']",  # 包含avatar的类
+                    "img[alt*='user']",  # 用户图片
+                    "#user-avatar",  # 用户头像ID
+                    ".avatar"  # 头像类
+                ]
+                
+                clicked_avatar = False
+                for selector in user_avatar_selectors:
+                    try:
+                        avatar_element = await page.query_selector(selector)
+                        if avatar_element:
+                            logger.info(f"找到用户头像: {selector}")
+                            # 检查元素是否可见
+                            is_visible = await avatar_element.is_visible()
+                            logger.info(f"用户头像是否可见: {is_visible}")
+                            if is_visible:
+                                await avatar_element.click()
+                                logger.info("已点击用户头像")
+                                clicked_avatar = True
+                                break
+                            else:
+                                logger.warning("用户头像不可见")
+                    except Exception as e:
+                        logger.warning(f"点击用户头像 {selector} 失败: {e}")
+                
+                # 如果没有找到用户头像，尝试截取页面截图
+                if not clicked_avatar:
+                    logger.warning("未找到用户头像，截取页面截图...")
+                    screenshot_path = "page_screenshot.png"
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                    logger.info(f"页面截图已保存到 {screenshot_path}")
+                    
+                    # 保存页面内容到文件，以便分析
+                    content = await page.content()
+                    with open("page_content.html", "w", encoding="utf-8") as f:
+                        f.write(content)
+                    logger.info("页面内容已保存到page_content.html")
+                
+                # 等待登录界面出现
+                if clicked_avatar:
+                    logger.info("等待登录界面出现...")
+                    await asyncio.sleep(2)  # 等待2秒
+                
+                # 检查是否存在登录二维码
+                qr_code_selector = "img[src*='qrcode']"  # 二维码图片
+                login_form_selector = "form"  # 登录表单
+                
+                # 检查是否存在登录相关元素
+                has_qr_code = await page.query_selector(qr_code_selector) is not None
+                has_login_form = await page.query_selector(login_form_selector) is not None
+                
+                if has_qr_code or has_login_form:
+                    logger.info("检测到登录页面，需要登录")
+                    
+                    # 截取登录页面截图
+                    login_screenshot_path = "kimi_login_qr.png"
+                    await page.screenshot(path=login_screenshot_path, full_page=True)
+                    logger.info(f"登录二维码已保存到 {login_screenshot_path}")
+                    
+                    # 等待用户扫码登录
+                    logger.info("请扫描登录二维码进行登录...")
+                    logger.info("登录成功后，脚本将继续执行")
+                    
+                    # 等待输入框出现（表示登录成功）
+                    await page.wait_for_selector("[contenteditable='true']", timeout=300000)  # 5分钟超时，给用户足够时间扫码
+                    logger.info("登录成功，输入框已出现")
+                else:
+                    logger.info("无需登录或已经登录")
+            except Exception as e:
+                logger.warning(f"登录检测失败: {e}")
+            
+            # 等待输入框出现（优先查找contenteditable，适配Kimi AI）
+            logger.info("等待输入框出现...")
+            try:
+                # 尝试等待contenteditable输入框出现（Kimi AI使用）
+                await page.wait_for_selector("[contenteditable='true']", timeout=10000)
+                logger.info("contenteditable输入框已出现")
+            except Exception as e:
+                logger.warning(f"等待contenteditable输入框失败: {e}")
+                try:
+                    # 回退：等待textarea输入框出现
+                    await page.wait_for_selector("textarea", timeout=10000)
+                    logger.info("textarea输入框已出现")
+                except Exception as e2:
+                    logger.warning(f"等待textarea输入框也失败: {e2}")
+            
+            # 尝试找到输入框（适配Kimi AI）
+            input_selectors = [
+                "[contenteditable='true']",  # 优先查找contenteditable（Kimi AI使用）
+                "textarea",
+                "input[type='text']"
+            ]
+            
+            input_element = None
+            for selector in input_selectors:
+                try:
+                    input_element = await page.query_selector(selector)
+                    if input_element:
+                        logger.info(f"找到输入框: {selector}")
+                        # 检查输入框是否可见
+                        is_visible = await input_element.is_visible()
+                        logger.info(f"输入框是否可见: {is_visible}")
+                        break
+                except Exception as e:
+                    logger.warning(f"查找输入框 {selector} 失败: {e}")
+            
+            if not input_element:
+                # 尝试获取页面内容，看看页面结构
+                content = await page.content()
+                logger.info(f"页面内容长度: {len(content)}")
+                # 保存页面内容到文件，以便分析
+                with open("page_content.html", "w", encoding="utf-8") as f:
+                    f.write(content)
+                logger.info("页面内容已保存到page_content.html")
+                # 截取页面截图
+                screenshot_path = "page_screenshot.png"
+                await page.screenshot(path=screenshot_path, full_page=True)
+                logger.info(f"页面截图已保存到 {screenshot_path}")
+                raise Exception("无法找到输入框")
             
             # 输入问题
-            await page.fill("textarea", question)
-            await page.press("textarea", "Enter")
+            logger.info(f"输入问题: {question}")
+            # 对于contenteditable元素，使用type而不是fill
+            if "contenteditable" in input_element._selector:
+                await input_element.type(question)
+            else:
+                await input_element.fill(question)
+            
+            # 直接按Enter键发送（根据Kimi AI的操作流程）
+            logger.info("按Enter键发送问题...")
+            await input_element.press("Enter")
+            logger.info("问题已发送")
             
             # 等待回答生成
-            await asyncio.sleep(2)  # 等待输入完成
+            logger.info("等待回答生成...")
+            # 等待更长时间，确保回答完全生成
+            await asyncio.sleep(10)  # 等待10秒
             
             # 尝试提取回答
+            logger.info("尝试提取回答...")
             answer = await self.extract_answer(page)
             
             # 更新会话缓存

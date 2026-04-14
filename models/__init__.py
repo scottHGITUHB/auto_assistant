@@ -9,7 +9,8 @@ from .db import (
     MessageLog,
     Setting,
     db,
-    init_db
+    init_db,
+    get_db
 )
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "MessageLog",
     "Setting",
     "db",
-    "init_db"
+    "init_db",
+    "get_db"
 ]
