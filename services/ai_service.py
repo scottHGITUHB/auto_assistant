@@ -8,21 +8,16 @@ from .browser_manager import browser_manager
 try:
     from asyncio import timeout as asyncio_timeout
 except ImportError:
-    # 如果是Python 3.10及以下版本，使用自定义的timeout实现
-    class asyncio_timeout:
-        def __init__(self, timeout):
-            self.timeout = timeout
-        
-        async def __aenter__(self):
-            self.task = asyncio.create_task(asyncio.sleep(self.timeout))
-            return self
-        
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            if not self.task.done():
-                self.task.cancel()
-            if exc_type is asyncio.CancelledError:
-                raise asyncio.TimeoutError("Timeout")
-            return False
+    # Python 3.10及以下使用wait_for包装
+    import asyncio
+    from contextlib import asynccontextmanager
+    
+    @asynccontextmanager
+    async def asyncio_timeout(timeout):
+        try:
+            yield
+        except asyncio.TimeoutError:
+            raise
 
 load_dotenv()
 
@@ -64,6 +59,7 @@ class AIService:
     async def run_ai(self, question, user_id=None):
         """运行AI请求"""
         page = await browser_manager.get_page()
+        answer = None
         
         try:
             # 访问AI网站
@@ -117,8 +113,15 @@ class AIService:
             logger.error(f"AI处理失败: {e}")
             raise
         finally:
-            # 释放页面，放回池中
-            await browser_manager.release_page(page)
+            # 成功才回收页面，失败则关闭页面
+            if answer:
+                await browser_manager.release_page(page)
+            else:
+                try:
+                    await page.close()
+                    logger.info("页面处理失败，已关闭页面")
+                except Exception as close_error:
+                    logger.warning(f"关闭页面失败: {close_error}")
     
     async def get_ai_answer(self, question, user_id=None):
         """获取AI回答，支持超时和重试"""
@@ -130,10 +133,17 @@ class AIService:
             while retry_count <= max_retries:
                 try:
                     # 超时控制
-                    async with asyncio_timeout(self.ai_timeout / 1000):
-                        answer = await self.run_ai(question, user_id)
-                        logger.info(f"AI回答成功，长度: {len(answer)}")
-                        return answer
+                    try:
+                        from asyncio import timeout as asyncio_timeout
+                        # Python 3.11+ 使用内置timeout
+                        async with asyncio_timeout(self.ai_timeout / 1000):
+                            answer = await self.run_ai(question, user_id)
+                    except ImportError:
+                        # Python 3.10及以下使用wait_for
+                        answer = await asyncio.wait_for(self.run_ai(question, user_id), timeout=self.ai_timeout / 1000)
+                    
+                    logger.info(f"AI回答成功，长度: {len(answer)}")
+                    return answer
                 except asyncio.TimeoutError:
                     retry_count += 1
                     if retry_count > max_retries:

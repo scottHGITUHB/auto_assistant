@@ -52,8 +52,8 @@ class QueueService:
         message = task.get("message")
         
         try:
-            from .ai_service import ai_service
-            from .wechat_service import wechat_service
+            from services.ai_service import ai_service
+            from services.wechat_service import wechat_service
             
             # 获取AI回答
             answer = await ai_service.get_ai_answer(question, user_id)

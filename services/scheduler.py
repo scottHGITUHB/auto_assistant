@@ -2,7 +2,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
 from models import db, CrawlerTask, Reminder, PushContent
-from services import crawler_service, wechat_service
+from .crawler_service import crawler_service
+from .wechat_service import wechat_service
 import asyncio
 import logging
 import os
@@ -96,9 +97,14 @@ class Scheduler:
     
     async def schedule_crawler_tasks(self):
         try:
-            # 使用同步session但在线程池中执行
+            # 使用同步session但在线程池中执行，为每个任务创建独立会话
             def get_tasks():
-                return db.session.query(CrawlerTask).filter_by(is_active=True).all()
+                from models.db import SessionLocal
+                session = SessionLocal()
+                try:
+                    return session.query(CrawlerTask).filter_by(is_active=True).all()
+                finally:
+                    session.close()
             
             loop = asyncio.get_event_loop()
             crawler_tasks = await loop.run_in_executor(None, get_tasks)
@@ -120,9 +126,14 @@ class Scheduler:
     async def schedule_reminder_tasks(self):
         """从数据库加载并调度提醒任务"""
         try:
-            # 使用同步session但在线程池中执行
+            # 使用同步session但在线程池中执行，为每个任务创建独立会话
             def get_reminders():
-                return db.session.query(Reminder).filter_by(is_done=False).all()
+                from models.db import SessionLocal
+                session = SessionLocal()
+                try:
+                    return session.query(Reminder).filter_by(is_done=False).all()
+                finally:
+                    session.close()
             
             loop = asyncio.get_event_loop()
             reminders = await loop.run_in_executor(None, get_reminders)
@@ -161,9 +172,14 @@ class Scheduler:
     
     async def schedule_push_tasks(self):
         try:
-            # 使用同步session但在线程池中执行
+            # 使用同步session但在线程池中执行，为每个任务创建独立会话
             def get_push_contents():
-                return db.session.query(PushContent).filter_by(is_active=True).all()
+                from models.db import SessionLocal
+                session = SessionLocal()
+                try:
+                    return session.query(PushContent).filter_by(is_active=True).all()
+                finally:
+                    session.close()
             
             loop = asyncio.get_event_loop()
             push_contents = await loop.run_in_executor(None, get_push_contents)
@@ -205,8 +221,19 @@ class Scheduler:
         try:
             message = f"提醒: {reminder.content}"
             await wechat_service.send_message(message, to=reminder.user_id)
-            reminder.is_done = True
-            db.session.commit()
+            
+            # 在新会话中更新状态
+            from models.db import SessionLocal, Reminder
+            session = SessionLocal()
+            try:
+                # 重新加载对象
+                reminder_db = session.query(Reminder).filter_by(id=reminder.id).first()
+                if reminder_db:
+                    reminder_db.is_done = True
+                    session.commit()
+            finally:
+                session.close()
+            
             logger.info(f"发送提醒成功: {reminder.content}")
         except Exception as e:
             logger.error(f"发送提醒失败: {e}")

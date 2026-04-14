@@ -4,7 +4,7 @@ import logging
 import hashlib
 from bs4 import BeautifulSoup
 from models import db
-from .wechat_service import wechat_service
+from services.wechat_service import wechat_service
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

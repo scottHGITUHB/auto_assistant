@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from models import db, Memory
+from models import get_db, Memory
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -21,8 +22,8 @@ class MemoryResponse(BaseModel):
 
 
 @router.get("", response_model=List[MemoryResponse])
-async def get_memories():
-    memories = db.session.query(Memory).all()
+async def get_memories(session: Session = Depends(get_db)):
+    memories = session.query(Memory).all()
     return [
         MemoryResponse(
             id=memory.id,
@@ -36,15 +37,15 @@ async def get_memories():
 
 
 @router.post("", response_model=MemoryResponse)
-async def create_memory(memory: MemoryCreate):
+async def create_memory(memory: MemoryCreate, session: Session = Depends(get_db)):
     new_memory = Memory(
         user_id=memory.user_id,
         content=memory.content,
         category=memory.category
     )
-    db.session.add(new_memory)
-    db.session.commit()
-    db.session.refresh(new_memory)
+    session.add(new_memory)
+    session.commit()
+    session.refresh(new_memory)
     return MemoryResponse(
         id=new_memory.id,
         user_id=new_memory.user_id,
@@ -55,11 +56,11 @@ async def create_memory(memory: MemoryCreate):
 
 
 @router.delete("/{memory_id}")
-async def delete_memory(memory_id: int):
-    existing_memory = db.session.query(Memory).filter_by(id=memory_id).first()
+async def delete_memory(memory_id: int, session: Session = Depends(get_db)):
+    existing_memory = session.query(Memory).filter_by(id=memory_id).first()
     if not existing_memory:
         raise HTTPException(status_code=404, detail="记忆不存在")
     
-    db.session.delete(existing_memory)
-    db.session.commit()
+    session.delete(existing_memory)
+    session.commit()
     return {"status": "success"}

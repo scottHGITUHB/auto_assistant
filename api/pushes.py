@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from models import db, PushContent
+from models import get_db, PushContent
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -33,8 +34,8 @@ class PushContentResponse(BaseModel):
 
 
 @router.get("", response_model=List[PushContentResponse])
-async def get_pushes():
-    pushes = db.session.query(PushContent).all()
+async def get_pushes(session: Session = Depends(get_db)):
+    pushes = session.query(PushContent).all()
     return [
         PushContentResponse(
             id=push.id,
@@ -50,7 +51,7 @@ async def get_pushes():
 
 
 @router.post("", response_model=PushContentResponse)
-async def create_push(push: PushContentCreate):
+async def create_push(push: PushContentCreate, session: Session = Depends(get_db)):
     new_push = PushContent(
         title=push.title,
         content=push.content,
@@ -58,9 +59,9 @@ async def create_push(push: PushContentCreate):
         target_group=push.target_group,
         is_active=push.is_active
     )
-    db.session.add(new_push)
-    db.session.commit()
-    db.session.refresh(new_push)
+    session.add(new_push)
+    session.commit()
+    session.refresh(new_push)
     return PushContentResponse(
         id=new_push.id,
         title=new_push.title,
@@ -73,8 +74,8 @@ async def create_push(push: PushContentCreate):
 
 
 @router.put("/{push_id}", response_model=PushContentResponse)
-async def update_push(push_id: int, push: PushContentUpdate):
-    existing_push = db.session.query(PushContent).filter_by(id=push_id).first()
+async def update_push(push_id: int, push: PushContentUpdate, session: Session = Depends(get_db)):
+    existing_push = session.query(PushContent).filter_by(id=push_id).first()
     if not existing_push:
         raise HTTPException(status_code=404, detail="推送内容不存在")
     
@@ -84,8 +85,8 @@ async def update_push(push_id: int, push: PushContentUpdate):
     existing_push.target_group = push.target_group
     existing_push.is_active = push.is_active
     
-    db.session.commit()
-    db.session.refresh(existing_push)
+    session.commit()
+    session.refresh(existing_push)
     return PushContentResponse(
         id=existing_push.id,
         title=existing_push.title,
@@ -98,11 +99,11 @@ async def update_push(push_id: int, push: PushContentUpdate):
 
 
 @router.delete("/{push_id}")
-async def delete_push(push_id: int):
-    existing_push = db.session.query(PushContent).filter_by(id=push_id).first()
+async def delete_push(push_id: int, session: Session = Depends(get_db)):
+    existing_push = session.query(PushContent).filter_by(id=push_id).first()
     if not existing_push:
         raise HTTPException(status_code=404, detail="推送内容不存在")
     
-    db.session.delete(existing_push)
-    db.session.commit()
+    session.delete(existing_push)
+    session.commit()
     return {"status": "success"}

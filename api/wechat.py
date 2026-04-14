@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Response, Depends
 from pydantic import BaseModel
 import os
 from datetime import datetime
@@ -8,7 +8,8 @@ from wechatpy.utils import check_signature
 from wechatpy.exceptions import InvalidSignatureException
 from wechatpy.crypto import WeChatCrypto
 from services import wechat_service
-from models import db
+from models import get_db, Memory, Reminder, FinanceRecord
+from sqlalchemy.orm import Session
 
 load_dotenv()
 
@@ -46,7 +47,7 @@ async def wechat_webhook_verify(request: Request):
 
 
 @router.post("/webhook")
-async def wechat_webhook_receive(request: Request):
+async def wechat_webhook_receive(request: Request, session: Session = Depends(get_db)):
     body = await request.body()
     try:
         # 获取请求参数
@@ -66,7 +67,8 @@ async def wechat_webhook_receive(request: Request):
             message = parse_message(decrypted_xml)
         else:
             # 未配置加密，直接解析
-            message = parse_message(body)
+            body_str = body.decode('utf-8')
+            message = parse_message(body_str)
         
         # 处理不同类型的消息
         if message.type == "text":
@@ -84,46 +86,45 @@ async def wechat_webhook_receive(request: Request):
                     "question": question,
                     "user_id": message.from_user,
                     "message_id": message.id,
-                    "message": message
+                    "from_user": message.from_user,
+                    "to_user": message.to_user,
+                    "msg_type": message.type
                 })
                 
                 # 立即返回成功，不阻塞
                 reply = create_reply("收到您的问题，正在处理中...", message)
-                return reply.render()
+                return Response(content=reply.render(), media_type="application/xml")
             
             # 处理记忆功能
             elif content.startswith("记住"):
                 memory_content = content.replace("记住", "").strip()
-                from models import Memory
                 new_memory = Memory(
                     user_id=message.from_user,
                     content=memory_content,
                     category="default"
                 )
-                db.session.add(new_memory)
-                db.session.commit()
+                session.add(new_memory)
+                session.commit()
                 reply = create_reply("已记住", message)
-                return reply.render()
+                return Response(content=reply.render(), media_type="application/xml")
             
             # 处理提醒功能
             elif content.startswith("提醒我"):
                 reminder_content = content.replace("提醒我", "").strip()
                 # 这里需要解析时间，简化处理
-                from models import Reminder
                 new_reminder = Reminder(
                     user_id=message.from_user,
                     content=reminder_content,
                     remind_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )
-                db.session.add(new_reminder)
-                db.session.commit()
+                session.add(new_reminder)
+                session.commit()
                 reply = create_reply("已设置提醒", message)
-                return reply.render()
+                return Response(content=reply.render(), media_type="application/xml")
             
             # 处理理财记录
             elif content.startswith("记录"):
                 # 简化处理，实际需要解析金额和类型
-                from models import FinanceRecord
                 new_record = FinanceRecord(
                     user_id=message.from_user,
                     type="expense",
@@ -132,14 +133,14 @@ async def wechat_webhook_receive(request: Request):
                     note=content,
                     record_date=datetime.now().strftime("%Y-%m-%d")
                 )
-                db.session.add(new_record)
-                db.session.commit()
+                session.add(new_record)
+                session.commit()
                 reply = create_reply("已记录", message)
-                return reply.render()
+                return Response(content=reply.render(), media_type="application/xml")
         
         # 默认回复
         reply = create_reply("收到消息", message)
-        return reply.render()
+        return Response(content=reply.render(), media_type="application/xml")
     except Exception as e:
         print(f"处理消息失败: {e}")
         return {"status": "error", "message": str(e)}

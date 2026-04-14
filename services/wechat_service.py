@@ -20,6 +20,7 @@ class WeChatService:
         self.access_token = None
         self.expire_time = 0  # token过期时间
         self.session = None
+        self._token_lock = None  # 异步锁，用于防止并发获取token
     
     async def get_session(self):
         """获取aiohttp会话"""
@@ -36,27 +37,38 @@ class WeChatService:
     async def get_access_token(self):
         """异步获取access token，带缓存"""
         import time
+        import asyncio
         now = time.time()
         
         # 检查token是否有效（提前300秒刷新）
         if self.access_token and now < self.expire_time - 300:
             return self.access_token
         
-        # 需要重新获取token
-        session = await self.get_session()
-        url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={self.corpid}&corpsecret={self.secret}"
-        try:
-            async with session.get(url, timeout=5) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if result.get("errcode") == 0:
-                        self.access_token = result.get("access_token")
-                        # 设置过期时间（企业微信token有效期为7200秒）
-                        self.expire_time = now + result.get("expires_in", 7200)
-                        logger.info("获取access token成功，有效期7200秒")
-        except Exception as e:
-            logger.error(f"获取access token失败: {e}")
-        return self.access_token
+        # 初始化锁
+        if self._token_lock is None:
+            self._token_lock = asyncio.Lock()
+        
+        # 使用锁防止并发获取token
+        async with self._token_lock:
+            # 再次检查token是否有效（可能在等待锁的过程中已经被其他线程刷新）
+            if self.access_token and now < self.expire_time - 300:
+                return self.access_token
+            
+            # 需要重新获取token
+            session = await self.get_session()
+            url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={self.corpid}&corpsecret={self.secret}"
+            try:
+                async with session.get(url, timeout=5) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        if result.get("errcode") == 0:
+                            self.access_token = result.get("access_token")
+                            # 设置过期时间（企业微信token有效期为7200秒）
+                            self.expire_time = now + result.get("expires_in", 7200)
+                            logger.info("获取access token成功，有效期7200秒")
+            except Exception as e:
+                logger.error(f"获取access token失败: {e}")
+            return self.access_token
     
     def escape_special_chars(self, message):
         """处理特殊字符，避免企微接口报错"""

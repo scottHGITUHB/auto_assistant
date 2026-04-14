@@ -9,7 +9,7 @@ bcrypt
 psycopg2-binary
 sqlalchemy
 python-dateutil
-wechatpy
+wechatpy>=1.8.0
 requests
 lxml
 beautifulsoup4

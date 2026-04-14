@@ -65,8 +65,12 @@ class BrowserManager:
     async def release_page(self, page):
         """释放页面，放回池中"""
         if page:
-            self.page_pool.append(page)
-            logger.info(f"页面已释放，池中页面数: {len(self.page_pool)}")
+            if len(self.page_pool) >= 5:  # 最大保持5个页面
+                await page.close()
+                logger.info("页面池已满，关闭页面")
+            else:
+                self.page_pool.append(page)
+                logger.info(f"页面已释放，池中页面数: {len(self.page_pool)}")
     
     async def close(self):
         """关闭浏览器，释放资源"""

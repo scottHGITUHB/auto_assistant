@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from models import db, FinanceRecord
+from models import get_db, FinanceRecord
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -35,8 +36,8 @@ class FinanceStatsResponse(BaseModel):
 
 
 @router.get("", response_model=List[FinanceRecordResponse])
-async def get_finance_records():
-    records = db.session.query(FinanceRecord).all()
+async def get_finance_records(session: Session = Depends(get_db)):
+    records = session.query(FinanceRecord).all()
     return [
         FinanceRecordResponse(
             id=record.id,
@@ -53,7 +54,7 @@ async def get_finance_records():
 
 
 @router.post("", response_model=FinanceRecordResponse)
-async def create_finance_record(record: FinanceRecordCreate):
+async def create_finance_record(record: FinanceRecordCreate, session: Session = Depends(get_db)):
     new_record = FinanceRecord(
         user_id=record.user_id,
         type=record.type,
@@ -62,9 +63,9 @@ async def create_finance_record(record: FinanceRecordCreate):
         note=record.note,
         record_date=record.record_date
     )
-    db.session.add(new_record)
-    db.session.commit()
-    db.session.refresh(new_record)
+    session.add(new_record)
+    session.commit()
+    session.refresh(new_record)
     return FinanceRecordResponse(
         id=new_record.id,
         user_id=new_record.user_id,
@@ -78,8 +79,8 @@ async def create_finance_record(record: FinanceRecordCreate):
 
 
 @router.get("/stats", response_model=FinanceStatsResponse)
-async def get_finance_stats():
-    records = db.session.query(FinanceRecord).all()
+async def get_finance_stats(session: Session = Depends(get_db)):
+    records = session.query(FinanceRecord).all()
     
     total_income = sum(r.amount for r in records if r.type == "income")
     total_expense = sum(r.amount for r in records if r.type == "expense")

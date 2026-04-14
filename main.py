@@ -119,18 +119,25 @@ async def health_check():
 async def dashboard_stats():
     """仪表盘统计数据"""
     from datetime import datetime
-    from models import db, PushContent, MessageLog
+    from models.db import SessionLocal, PushContent, MessageLog
     
+    session = SessionLocal()
     try:
-        # 统计今日推送数
         today = datetime.now().strftime("%Y-%m-%d")
         
-        # 这里可以添加具体的统计逻辑
-        # 例如：统计今日推送数量、消息处理数量等
+        # 统计今日推送数
+        today_pushes = session.query(PushContent).filter(
+            PushContent.created_at >= today
+        ).count()
+        
+        # 统计今日消息数
+        message_stats = session.query(MessageLog).filter(
+            MessageLog.created_at >= today
+        ).count()
         
         return {
-            "today_pushes": 0,
-            "message_stats": 0,
+            "today_pushes": today_pushes,
+            "message_stats": message_stats,
             "task_status": "正常"
         }
     except Exception as e:
@@ -140,6 +147,8 @@ async def dashboard_stats():
             "message_stats": 0,
             "task_status": "正常"
         }
+    finally:
+        session.close()
 
 
 if __name__ == "__main__":

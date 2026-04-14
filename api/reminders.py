@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from models import db, Reminder
+from models import get_db, Reminder
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -22,8 +23,8 @@ class ReminderResponse(BaseModel):
 
 
 @router.get("", response_model=List[ReminderResponse])
-async def get_reminders():
-    reminders = db.session.query(Reminder).all()
+async def get_reminders(session: Session = Depends(get_db)):
+    reminders = session.query(Reminder).all()
     return [
         ReminderResponse(
             id=reminder.id,
@@ -38,16 +39,16 @@ async def get_reminders():
 
 
 @router.post("", response_model=ReminderResponse)
-async def create_reminder(reminder: ReminderCreate):
+async def create_reminder(reminder: ReminderCreate, session: Session = Depends(get_db)):
     new_reminder = Reminder(
         user_id=reminder.user_id,
         content=reminder.content,
         remind_at=reminder.remind_at,
         is_done=False
     )
-    db.session.add(new_reminder)
-    db.session.commit()
-    db.session.refresh(new_reminder)
+    session.add(new_reminder)
+    session.commit()
+    session.refresh(new_reminder)
     return ReminderResponse(
         id=new_reminder.id,
         user_id=new_reminder.user_id,
@@ -59,14 +60,14 @@ async def create_reminder(reminder: ReminderCreate):
 
 
 @router.put("/{reminder_id}/done")
-async def mark_reminder_done(reminder_id: int):
-    existing_reminder = db.session.query(Reminder).filter_by(id=reminder_id).first()
+async def mark_reminder_done(reminder_id: int, session: Session = Depends(get_db)):
+    existing_reminder = session.query(Reminder).filter_by(id=reminder_id).first()
     if not existing_reminder:
         raise HTTPException(status_code=404, detail="提醒不存在")
     
     existing_reminder.is_done = True
-    db.session.commit()
-    db.session.refresh(existing_reminder)
+    session.commit()
+    session.refresh(existing_reminder)
     return ReminderResponse(
         id=existing_reminder.id,
         user_id=existing_reminder.user_id,
