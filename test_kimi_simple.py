@@ -8,6 +8,15 @@ if not os.path.exists(TEST_DIR):
     os.makedirs(TEST_DIR)
     print(f"创建测试文件夹: {TEST_DIR}")
 
+def is_logged_in(page):
+    """检测是否已登录"""
+    try:
+        # 方法1：检测输入框（最稳）
+        input_box = page.locator('[contenteditable="true"], textarea').first
+        return input_box.is_visible()
+    except:
+        return False
+
 def test_kimi_login():
     print("测试 Kimi 登录流程...")
     try:
@@ -16,11 +25,22 @@ def test_kimi_login():
             print("1. 启动浏览器...")
             browser = p.chromium.launch(headless=False)
             
+            # 检查是否有已保存的登录状态
+            storage_path = os.path.join(TEST_DIR, "kimi_auth.json")
+            
             # 创建上下文和页面
             print("2. 创建页面...")
-            context = browser.new_context(
-                viewport={'width': 1920, 'height': 1080}
-            )
+            if os.path.exists(storage_path):
+                print("✅ 使用已保存的登录状态")
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    storage_state=storage_path
+                )
+            else:
+                print("⚠️ 未找到登录状态，需要扫码登录")
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080}
+                )
             page = context.new_page()
             
             # 打开Kimi AI
@@ -37,58 +57,233 @@ def test_kimi_login():
             page.screenshot(path=screenshot_path)
             print(f"5. 初始页面截图已保存: {screenshot_path}")
             
-            # 查找登录按钮
-            print("6. 查找登录按钮...")
-            try:
-                # 尝试多种登录按钮选择器
-                login_selectors = [
-                    'text=登录',
-                    '.login-button',
-                    '#login',
-                    '[data-testid="login"]',
-                    'button:has-text("登录")'
-                ]
+            # 检测是否已登录
+            print("6. 检测登录状态...")
+            if is_logged_in(page):
+                print("✅ 已登录，无需扫码")
                 
-                login_found = False
-                for selector in login_selectors:
-                    try:
-                        login_button = page.locator(selector).first
-                        if login_button.is_visible():
-                            print(f"✅ 找到登录按钮，使用选择器: {selector}")
-                            login_found = True
+                # 找到聊天输入框并粘贴"你好"
+                print("7. 查找聊天输入框...")
+                try:
+                    # 查找聊天输入框
+                    chat_input = page.locator('[contenteditable="true"], textarea').first
+                    if chat_input.is_visible():
+                        print("✅ 找到聊天输入框")
+                        # 粘贴"你好"
+                        chat_input.click()
+                        chat_input.fill("你好")
+                        print("✅ 已在输入框中粘贴: 你好")
+                        # 截图输入框状态
+                        screenshot_path = os.path.join(TEST_DIR, "input_filled.png")
+                        page.screenshot(path=screenshot_path)
+                        print(f"8. 输入框状态截图已保存: {screenshot_path}")
+                        
+                        # 按回车发送消息
+                        print("9. 按回车发送消息...")
+                        chat_input.press("Enter")
+                        print("✅ 消息已发送")
+                        
+                        # 等待Kimi助手的回复并提取文本
+                        print("10. 等待Kimi助手的回复...")
+                        try:
+                            # 核心方法：使用DOM变化监听 + 稳定性判断获取AI回复
+                            def get_ai_response(page, timeout=60):
+                                """稳定获取AI回复（基于文本稳定性检测）"""
+
+                                print("🔍 等待AI回复出现...")
+
+                                # 1. 等待至少出现一条AI消息
+                                page.wait_for_selector('.markdown, .assistant, .message', timeout=timeout*1000)
+
+                                last_text = ""
+                                stable_count = 0
+                                max_stable = 3  # 连续3次不变认为结束
+
+                                start_time = time.time()
+
+                                while time.time() - start_time < timeout:
+                                    try:
+                                        # 2. 获取最后一条消息
+                                        messages = page.locator('.markdown, .assistant, .message').all()
+                                        if not messages:
+                                            continue
+
+                                        current_text = messages[-1].inner_text().strip()
+
+                                        if not current_text:
+                                            time.sleep(1)
+                                            continue
+
+                                        print(f"📝 当前长度: {len(current_text)}")
+
+                                        # 3. 判断是否稳定
+                                        if current_text == last_text:
+                                            stable_count += 1
+                                            print(f"⏳ 稳定计数: {stable_count}/{max_stable}")
+                                        else:
+                                            stable_count = 0
+
+                                        if stable_count >= max_stable:
+                                            print("✅ 检测到回复完成")
+                                            return current_text
+
+                                        last_text = current_text
+                                        time.sleep(1)
+
+                                    except Exception as e:
+                                        print(f"⚠️ 读取失败: {e}")
+                                        time.sleep(1)
+
+                                print("❌ 超时，返回当前结果")
+                                return last_text
+                            
+                            # 获取AI回复
+                            response_text = get_ai_response(page, timeout=30)
+                            
+                            # 点击复制按钮
+                            print("11. 点击复制按钮...")
+                            clipboard_text = ""
                             try:
-                                login_button.click()
-                                print("7. 点击登录按钮")
-                                # 等待可能的新窗口或登录界面出现
-                                time.sleep(3)
+                                # 查找复制按钮
+                                # 尝试多种可能的复制按钮选择器
+                                copy_selectors = [
+                                    # 查找回复内容附近的按钮
+                                    '.message-actions button',
+                                    '.chat-message-actions button',
+                                    # 查找带有复制图标的按钮
+                                    'button:has(svg)',
+                                    # 查找带有特定类名的按钮
+                                    '[class*="copy"], [class*="clipboard"]',
+                                    # 查找所有可见的按钮
+                                    'button:visible'
+                                ]
                                 
-                                # 检查是否有新窗口打开
-                                print("8. 检查是否有新窗口打开...")
-                                try:
-                                    # 获取所有页面
-                                    pages = context.pages
-                                    if len(pages) > 1:
-                                        # 切换到新页面
-                                        page = pages[-1]
-                                        print(f"✅ 发现新窗口，切换到新页面: {page.url}")
-                                    else:
-                                        print("ℹ️  未发现新窗口，继续使用当前页面")
-                                except Exception as e:
-                                    print(f"检查新窗口时出错: {e}")
+                                copy_button_found = False
+                                for selector in copy_selectors:
+                                    try:
+                                        copy_buttons = page.locator(selector).all()
+                                        for button in copy_buttons:
+                                            if button.is_visible():
+                                                # 尝试点击按钮
+                                                button.click()
+                                                print("✅ 点击了一个按钮")
+                                                
+                                                # 等待复制操作完成
+                                                time.sleep(1)
+                                                
+                                                # 尝试获取剪贴板内容
+                                                try:
+                                                    clipboard_text = page.evaluate("navigator.clipboard.readText()")
+                                                    if clipboard_text and ("你好" in clipboard_text or "很高兴" in clipboard_text):
+                                                        print("✅ 从剪贴板获取到内容:")
+                                                        print(f"\n{clipboard_text}\n")
+                                                        
+                                                        # 保存复制的内容到文件
+                                                        clipboard_file = os.path.join(TEST_DIR, "kimi_clipboard.txt")
+                                                        with open(clipboard_file, "w", encoding="utf-8") as f:
+                                                            f.write(clipboard_text)
+                                                        print(f"✅ 复制的内容已保存到: {clipboard_file}")
+                                                        copy_button_found = True
+                                                        break
+                                                except Exception as e:
+                                                    print(f"获取剪贴板内容时出错: {e}")
+                                    except Exception as e:
+                                        print(f"尝试选择器 {selector} 时出错: {e}")
+                                    
+                                    if copy_button_found:
+                                        break
                                 
-                                # 截图登录界面
-                                screenshot_path = os.path.join(TEST_DIR, "login_page.png")
-                                page.screenshot(path=screenshot_path)
-                                print(f"9. 登录界面截图已保存: {screenshot_path}")
-                                break
+                                if not copy_button_found:
+                                    print("❌ 未找到复制按钮")
                             except Exception as e:
-                                print(f"❌ 点击登录按钮失败: {e}")
-                                # 截图当前页面
-                                screenshot_path = os.path.join(TEST_DIR, "login_button_error.png")
-                                page.screenshot(path=screenshot_path)
-                                print(f"📸 错误页面截图已保存: {screenshot_path}")
-                    except Exception as e:
-                        print(f"尝试选择器 {selector} 失败: {e}")
+                                print(f"点击复制按钮时出错: {e}")
+                            
+                            # 如果通过复制按钮获取到内容，使用剪贴板内容
+                            if clipboard_text:
+                                response_text = clipboard_text
+                            
+                            if response_text:
+                                print("✅ 最终获取到Kimi助手的回复:")
+                                print(f"\n{response_text}\n")
+                                # 保存回复到文件
+                                response_file = os.path.join(TEST_DIR, "kimi_response.txt")
+                                with open(response_file, "w", encoding="utf-8") as f:
+                                    f.write(response_text)
+                                print(f"✅ 回复已保存到: {response_file}")
+                            else:
+                                print("❌ 未获取到回复文字")
+                                # 截图当前页面，便于分析
+                                debug_screenshot = os.path.join(TEST_DIR, "debug_response.png")
+                                page.screenshot(path=debug_screenshot)
+                                print(f"📸 调试截图已保存: {debug_screenshot}")
+                        except Exception as e:
+                            print(f"获取回复时出错: {e}")
+                        
+                        # 截图回复状态
+                        screenshot_path = os.path.join(TEST_DIR, "response_received.png")
+                        page.screenshot(path=screenshot_path)
+                        print(f"12. 回复状态截图已保存: {screenshot_path}")
+                    else:
+                        print("❌ 聊天输入框不可见")
+                except Exception as e:
+                    print(f"操作输入框时出错: {e}")
+            else:
+                print("❌ 未登录，需要重新扫码")
+                
+                # 查找登录按钮
+                print("7. 查找登录按钮...")
+                try:
+                    # 尝试多种登录按钮选择器
+                    login_selectors = [
+                        'text=登录',
+                        '.login-button',
+                        '#login',
+                        '[data-testid="login"]',
+                        'button:has-text("登录")'
+                    ]
+                    
+                    login_found = False
+                    for selector in login_selectors:
+                        try:
+                            login_button = page.locator(selector).first
+                            if login_button.is_visible():
+                                print(f"✅ 找到登录按钮，使用选择器: {selector}")
+                                login_found = True
+                                try:
+                                    login_button.click()
+                                    print("7. 点击登录按钮")
+                                    # 等待可能的新窗口或登录界面出现
+                                    time.sleep(3)
+                                    
+                                    # 检查是否有新窗口打开
+                                    print("8. 检查是否有新窗口打开...")
+                                    try:
+                                        # 获取所有页面
+                                        pages = context.pages
+                                        if len(pages) > 1:
+                                            # 切换到新页面
+                                            page = pages[-1]
+                                            print(f"✅ 发现新窗口，切换到新页面: {page.url}")
+                                        else:
+                                            print("ℹ️  未发现新窗口，继续使用当前页面")
+                                    except Exception as e:
+                                        print(f"检查新窗口时出错: {e}")
+                                    
+                                    # 截图登录界面
+                                    screenshot_path = os.path.join(TEST_DIR, "login_page.png")
+                                    page.screenshot(path=screenshot_path)
+                                    print(f"9. 登录界面截图已保存: {screenshot_path}")
+                                    break
+                                except Exception as e:
+                                    print(f"❌ 点击登录按钮失败: {e}")
+                                    # 截图当前页面
+                                    screenshot_path = os.path.join(TEST_DIR, "login_button_error.png")
+                                    page.screenshot(path=screenshot_path)
+                                    print(f"📸 错误页面截图已保存: {screenshot_path}")
+                        except Exception as e:
+                            print(f"尝试选择器 {selector} 失败: {e}")
+                except Exception as e:
+                    print(f"❌ 查找登录按钮失败: {e}")
                 
                 if not login_found:
                     print("❌ 未找到登录按钮")
@@ -239,76 +434,56 @@ def test_kimi_login():
                                                     # 等待Kimi助手的回复并提取文本
                                                     print("17. 等待Kimi助手的回复...")
                                                     try:
-                                                        # 核心方法：等待回答开始生成并提取文本
+                                                        # 核心方法：使用DOM变化监听 + 稳定性判断获取AI回复
                                                         def get_ai_response(page, timeout=60):
-                                                            """获取AI回答的完整流程"""
-                                                            
-                                                            # 1. 先等回答开始生成（输入框变空或出现loading）
-                                                            print("🔍 等待回答开始生成...")
-                                                            try:
-                                                                # 尝试等待loading指示器出现
-                                                                page.locator('.loading, .generating-indicator, .loading-indicator, .typing-indicator').wait_for(timeout=10000)
-                                                                print("✅ 检测到回答开始生成")
-                                                            except Exception as e:
-                                                                print(f"ℹ️  未检测到loading指示器: {e}，继续等待")
-                                                            
-                                                            # 2. 等回答完成（等待"停止生成"按钮消失）
-                                                            print("🔍 等待回答生成完成...")
-                                                            try:
-                                                                # 尝试等待"停止生成"按钮消失
-                                                                page.locator('button:has-text("停止生成")').wait_for(state="hidden", timeout=timeout*1000)
-                                                                print("✅ 检测到回答生成完成")
-                                                            except Exception as e:
-                                                                print(f"ℹ️  未检测到'停止生成'按钮: {e}，继续等待")
-                                                            
-                                                            # 3. 稍微延迟确保DOM更新
-                                                            print("⏳ 等待DOM更新...")
-                                                            page.wait_for_timeout(1500)
-                                                            print("✅ DOM更新完成")
-                                                            
-                                                            # 4. 提取回答
-                                                            response_text = ""
-                                                            # 策略1：通过角色属性定位AI回答
-                                                            try:
-                                                                response = page.locator('[data-role="assistant"], .ai-message, .bot-reply, .assistant-content').last
-                                                                if response.is_visible():
-                                                                    response_text = response.inner_text()
-                                                                    print("✅ 通过角色属性定位到AI回答")
-                                                            except:
-                                                                pass
-                                                            
-                                                            # 策略2：通过排除法找最后一个非用户消息
-                                                            if not response_text:
+                                                            """稳定获取AI回复（基于文本稳定性检测）"""
+
+                                                            print("🔍 等待AI回复出现...")
+
+                                                            # 1. 等待至少出现一条AI消息
+                                                            page.wait_for_selector('.markdown, .assistant, .message', timeout=timeout*1000)
+
+                                                            last_text = ""
+                                                            stable_count = 0
+                                                            max_stable = 3  # 连续3次不变认为结束
+
+                                                            start_time = time.time()
+
+                                                            while time.time() - start_time < timeout:
                                                                 try:
-                                                                    all_messages = page.locator('.message, .chat-item, .message-bubble, .content-block')
-                                                                    last_response = all_messages.filter(has_not=page.locator('.user-avatar, [data-role="user"]')).last
-                                                                    if last_response.is_visible():
-                                                                        response_text = last_response.inner_text()
-                                                                        print("✅ 通过排除法定位到AI回答")
-                                                                except:
-                                                                    pass
-                                                            
-                                                            # 策略3：直接取最后一个消息气泡
-                                                            if not response_text:
-                                                                try:
-                                                                    response = page.locator('.message-bubble, .content-block, .chat-content').last
-                                                                    if response.is_visible():
-                                                                        response_text = response.inner_text()
-                                                                        print("✅ 直接取最后一个消息气泡")
-                                                                except:
-                                                                    pass
-                                                            
-                                                            # 策略4：查找包含特定文本的元素
-                                                            if not response_text:
-                                                                try:
-                                                                    response_elements = page.locator('div').filter(has_text=lambda text: text and ("你好" in text or "很高兴" in text)).all()
-                                                                    if response_elements:
-                                                                        response_text = response_elements[-1].inner_text()
-                                                                        print("✅ 通过文本内容定位到AI回答")
-                                                                except:
-                                                                    pass
-                                                            
-                                                            return response_text
+                                                                    # 2. 获取最后一条消息
+                                                                    messages = page.locator('.markdown, .assistant, .message').all()
+                                                                    if not messages:
+                                                                        continue
+
+                                                                    current_text = messages[-1].inner_text().strip()
+
+                                                                    if not current_text:
+                                                                        time.sleep(1)
+                                                                        continue
+
+                                                                    print(f"📝 当前长度: {len(current_text)}")
+
+                                                                    # 3. 判断是否稳定
+                                                                    if current_text == last_text:
+                                                                        stable_count += 1
+                                                                        print(f"⏳ 稳定计数: {stable_count}/{max_stable}")
+                                                                    else:
+                                                                        stable_count = 0
+
+                                                                    if stable_count >= max_stable:
+                                                                        print("✅ 检测到回复完成")
+                                                                        return current_text
+
+                                                                    last_text = current_text
+                                                                    time.sleep(1)
+
+                                                                except Exception as e:
+                                                                    print(f"⚠️ 读取失败: {e}")
+                                                                    time.sleep(1)
+
+                                                            print("❌ 超时，返回当前结果")
+                                                            return last_text
                                                         
                                                         # 获取AI回复
                                                         response_text = get_ai_response(page, timeout=30)
@@ -431,11 +606,18 @@ def test_kimi_login():
                         screenshot_path = os.path.join(TEST_DIR, "no_qr_code.png")
                         page.screenshot(path=screenshot_path)
                         print(f"❌ 未找到二维码，当前页面截图已保存: {screenshot_path}")
+            
+            # 每次关闭前都保存登录状态
+            print("13. 保存登录状态...")
+            try:
+                storage_path = os.path.join(TEST_DIR, "kimi_auth.json")
+                context.storage_state(path=storage_path)
+                print(f"✅ 登录状态已保存到: {storage_path}")
             except Exception as e:
-                print(f"❌ 查找登录按钮失败: {e}")
+                print(f"保存登录状态时出错: {e}")
             
             # 关闭浏览器
-            print("13. 关闭浏览器")
+            print("14. 关闭浏览器")
             browser.close()
             print("✅ 测试完成")
     except Exception as e:

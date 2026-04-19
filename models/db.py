@@ -95,6 +95,15 @@ class Setting(Base):
     description = Column(Text)
 
 
+class SystemLog(Base):
+    __tablename__ = "system_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    level = Column(String(50))  # INFO, WARNING, ERROR
+    module = Column(String(100))
+    message = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

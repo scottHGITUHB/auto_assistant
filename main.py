@@ -8,7 +8,7 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from api import admin, wechat, pushes, crawlers, memories, reminders, finance
+from api import admin, wechat, pushes, crawlers, memories, reminders, finance, logs
 from services.scheduler import scheduler
 from models import db
 
@@ -52,12 +52,12 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"启动AI服务清理任务失败: {e}")
         
-        # 启动时检查更新
-        try:
-            from update import check_update_on_start
-            await check_update_on_start()
-        except Exception as e:
-            logger.warning(f"启动时检查更新失败: {e}")
+        # 启动时检查更新（已禁用以避免服务中断）
+        # try:
+        #     from update import check_update_on_start
+        #     await check_update_on_start()
+        # except Exception as e:
+        #     logger.warning(f"启动时检查更新失败: {e}")
         
         yield
         
@@ -103,6 +103,7 @@ app.include_router(crawlers.router, prefix="/api/crawlers", tags=["crawlers"])
 app.include_router(memories.router, prefix="/api/memories", tags=["memories"])
 app.include_router(reminders.router, prefix="/api/reminders", tags=["reminders"])
 app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
+app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 
 # 注册其他路由
 @app.get("/health")

@@ -23,7 +23,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化理财记录
     initFinance();
-    
+
+    // 初始化KimiAI日志
+    initKimiLogs();
+
+    // 初始化系统日志
+    initSystemLogs();
+
     // 初始化配置中心
     initSettings();
 });
@@ -396,5 +402,124 @@ function initSettings() {
     document.getElementById('settings-form').addEventListener('submit', function(e) {
         e.preventDefault();
         alert('配置已保存');
+    });
+}
+
+// 初始化KimiAI日志
+async function initKimiLogs() {
+    try {
+        const response = await fetch(`${API_BASE}/logs/messages`);
+        if (response.ok) {
+            const logs = await response.json();
+            const tableBody = document.querySelector('#kimi-logs-table tbody');
+            tableBody.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+                const directionText = log.direction === 'in' ? '发送' : '接收';
+                const statusText = log.status === 'success' ? '成功' : '失败';
+
+                row.innerHTML = `
+                    <td>${log.id}</td>
+                    <td>${directionText}</td>
+                    <td>${truncateText(log.content, 50)}</td>
+                    <td>${truncateText(log.response || '-', 50)}</td>
+                    <td>${statusText}</td>
+                    <td>${formatDateTime(log.created_at)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+    } catch (error) {
+        console.error('获取KimiAI日志失败:', error);
+    }
+}
+
+// 初始化系统日志
+async function initSystemLogs() {
+    try {
+        const levelFilter = document.getElementById('log-level-filter').value;
+        let url = `${API_BASE}/logs/system?limit=100`;
+        if (levelFilter) {
+            url += `&level=${levelFilter}`;
+        }
+
+        const response = await fetch(url);
+        if (response.ok) {
+            const logs = await response.json();
+            const tableBody = document.querySelector('#system-logs-table tbody');
+            tableBody.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${log.id}</td>
+                    <td><span class="log-level ${log.level.toLowerCase()}">${log.level}</span></td>
+                    <td>${log.module}</td>
+                    <td>${truncateText(log.message, 80)}</td>
+                    <td>${formatDateTime(log.created_at)}</td>
+                    <td class="action-buttons">
+                        <button class="delete" onclick="deleteSystemLog(${log.id})">删除</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+    } catch (error) {
+        console.error('获取系统日志失败:', error);
+    }
+
+    // 刷新按钮点击事件
+    document.getElementById('refresh-logs').addEventListener('click', function() {
+        initSystemLogs();
+    });
+
+    // 级别筛选变化事件
+    document.getElementById('log-level-filter').addEventListener('change', function() {
+        initSystemLogs();
+    });
+}
+
+// 删除系统日志
+async function deleteSystemLog(logId) {
+    if (!confirm('确定要删除这条日志吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/logs/system/${logId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            alert('删除成功');
+            initSystemLogs();
+        } else {
+            alert('删除失败');
+        }
+    } catch (error) {
+        console.error('删除系统日志失败:', error);
+        alert('删除失败');
+    }
+}
+
+// 工具函数：截断文本
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
+// 工具函数：格式化日期时间
+function formatDateTime(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
     });
 }

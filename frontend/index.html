@@ -20,6 +20,8 @@
                 <li><a href="#memories">记忆管理</a></li>
                 <li><a href="#reminders">提醒管理</a></li>
                 <li><a href="#finance">理财记录</a></li>
+                <li><a href="#kimi-logs">KimiAI日志</a></li>
+                <li><a href="#system-logs">系统日志</a></li>
                 <li><a href="#settings">配置中心</a></li>
             </ul>
         </nav>
@@ -146,7 +148,54 @@
                     <!-- 统计数据将通过JavaScript动态填充 -->
                 </div>
             </section>
-            
+
+            <section id="kimi-logs" style="display: none;">
+                <h2>KimiAI日志</h2>
+                <table id="kimi-logs-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>方向</th>
+                            <th>发送内容</th>
+                            <th>回复内容</th>
+                            <th>状态</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="system-logs" style="display: none;">
+                <h2>系统日志</h2>
+                <div class="log-filters">
+                    <select id="log-level-filter">
+                        <option value="">全部级别</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                    <button id="refresh-logs">刷新</button>
+                </div>
+                <table id="system-logs-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>级别</th>
+                            <th>模块</th>
+                            <th>消息</th>
+                            <th>时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态填充 -->
+                    </tbody>
+                </table>
+            </section>
+
             <section id="settings" style="display: none;">
                 <h2>配置中心</h2>
                 <form id="settings-form">
