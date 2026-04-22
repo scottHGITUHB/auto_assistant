@@ -411,28 +411,94 @@ async function initKimiLogs() {
         const response = await fetch(`${API_BASE}/logs/messages`);
         if (response.ok) {
             const logs = await response.json();
-            const tableBody = document.querySelector('#kimi-logs-table tbody');
-            tableBody.innerHTML = '';
+            const container = document.getElementById('kimi-logs-container');
+            container.innerHTML = '';
 
+            // 按日期分组
+            const logsByDay = {};
             logs.forEach(log => {
-                const row = document.createElement('tr');
-                const directionText = log.direction === 'in' ? '发送' : '接收';
-                const statusText = log.status === 'success' ? '成功' : '失败';
+                const date = new Date(log.created_at);
+                const dateStr = date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+                if (!logsByDay[dateStr]) {
+                    logsByDay[dateStr] = [];
+                }
+                logsByDay[dateStr].push(log);
+            });
 
-                row.innerHTML = `
-                    <td>${log.id}</td>
-                    <td>${directionText}</td>
-                    <td>${truncateText(log.content, 50)}</td>
-                    <td>${truncateText(log.response || '-', 50)}</td>
-                    <td>${statusText}</td>
-                    <td>${formatDateTime(log.created_at)}</td>
+            // 按日期倒序排序
+            const sortedDates = Object.keys(logsByDay).sort((a, b) => {
+                return new Date(b) - new Date(a);
+            });
+
+            // 为每个日期创建分组
+            sortedDates.forEach(date => {
+                const dayLogs = logsByDay[date];
+                const dayGroup = document.createElement('div');
+                dayGroup.className = 'day-group';
+
+                // 日期头部
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                dayHeader.innerHTML = `
+                    <span class="day-date">${date}</span>
+                    <span class="day-count">${dayLogs.length} 条消息</span>
                 `;
-                tableBody.appendChild(row);
+
+                // 日期内容
+                const dayContent = document.createElement('div');
+                dayContent.className = 'day-content';
+
+                // 为每条日志创建条目
+                dayLogs.forEach(log => {
+                    const logEntry = document.createElement('div');
+                    const directionClass = log.direction === 'in' ? 'sent' : 'received';
+                    const directionText = log.direction === 'in' ? '发送' : '接收';
+                    const statusText = log.status === 'success' ? '成功' : '失败';
+
+                    logEntry.className = `log-entry ${directionClass}`;
+                    logEntry.innerHTML = `
+                        <div class="log-meta">
+                            <span class="log-direction">${directionText}</span>
+                            <span class="log-time">${formatTime(log.created_at)}</span>
+                            <span class="log-status">${statusText}</span>
+                        </div>
+                        <div class="log-content">${log.content}</div>
+                        ${log.response ? `<div class="log-response">${log.response}</div>` : ''}
+                    `;
+                    dayContent.appendChild(logEntry);
+                });
+
+                // 点击头部展开/折叠
+                dayHeader.addEventListener('click', function() {
+                    dayContent.classList.toggle('expanded');
+                });
+
+                dayGroup.appendChild(dayHeader);
+                dayGroup.appendChild(dayContent);
+                container.appendChild(dayGroup);
             });
         }
     } catch (error) {
         console.error('获取KimiAI日志失败:', error);
+        // 显示错误信息
+        const container = document.getElementById('kimi-logs-container');
+        container.innerHTML = '<div style="text-align: center; color: red; padding: 20px;">获取日志失败，请刷新页面重试</div>';
     }
+}
+
+// 工具函数：格式化时间
+function formatTime(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
 }
 
 // 初始化系统日志

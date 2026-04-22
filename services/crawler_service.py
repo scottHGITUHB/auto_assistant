@@ -4,7 +4,6 @@ import logging
 import hashlib
 from bs4 import BeautifulSoup
 from models import db
-from services.wechat_service import wechat_service
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -40,8 +39,8 @@ class CrawlerService:
             crawler_task.last_result = result
             db_session.commit()
             
-            # 发送推送
-            await wechat_service.send_message(result, msgtype="markdown")
+            # 发送推送 - 暂时注释，因为我们使用智能机器人WebSocket方案
+            # await wechat_bot_service.send_message("@all", result)
             
             # 记录已推送的哈希
             self.result_hashes.add(result_hash)

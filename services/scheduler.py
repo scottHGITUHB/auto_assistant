@@ -3,7 +3,6 @@ from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
 from models import db, CrawlerTask, Reminder, PushContent
 from .crawler_service import crawler_service
-from .wechat_service import wechat_service
 import asyncio
 import logging
 import os
@@ -219,8 +218,10 @@ class Scheduler:
     
     async def send_reminder(self, reminder):
         try:
+            from .lark_bot_service import lark_bot_service
+            
             message = f"提醒: {reminder.content}"
-            await wechat_service.send_message(message, to=reminder.user_id)
+            await lark_bot_service.send_message(reminder.user_id, message)
             
             # 在新会话中更新状态
             from models.db import SessionLocal, Reminder
@@ -240,7 +241,9 @@ class Scheduler:
     
     async def send_push(self, push_content):
         try:
-            await wechat_service.send_message(push_content.content, to=push_content.target_group, msgtype="markdown")
+            from .lark_bot_service import lark_bot_service
+            
+            await lark_bot_service.send_message(push_content.target_group, push_content.content)
             logger.info(f"发送推送成功: {push_content.title}")
         except Exception as e:
             logger.error(f"发送推送失败: {e}")

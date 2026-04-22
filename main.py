@@ -8,7 +8,7 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from api import admin, wechat, pushes, crawlers, memories, reminders, finance, logs
+from api import admin, pushes, crawlers, memories, reminders, finance, logs, lark
 from services.scheduler import scheduler
 from models import db
 
@@ -52,6 +52,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"启动AI服务清理任务失败: {e}")
         
+        # 启动飞书机器人
+        try:
+            from services.lark_bot_service import start_bot
+            if await start_bot():
+                logger.info("飞书机器人启动成功")
+            else:
+                logger.warning("飞书机器人启动失败")
+        except Exception as e:
+            logger.warning(f"启动飞书机器人失败: {e}")
+        
         # 启动时检查更新（已禁用以避免服务中断）
         # try:
         #     from update import check_update_on_start
@@ -71,8 +81,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="企业微信机器人API",
-    description="企业微信机器人应用，集成自动化问答、信息推送、数据爬取和个人助理功能",
+    title="自动小助手API",
+    description="智能机器人应用，集成自动化问答、信息推送、数据爬取和个人助理功能",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -97,13 +107,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # 注册API路由
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
-app.include_router(wechat.router, prefix="/api/wechat", tags=["wechat"])
 app.include_router(pushes.router, prefix="/api/pushes", tags=["pushes"])
 app.include_router(crawlers.router, prefix="/api/crawlers", tags=["crawlers"])
 app.include_router(memories.router, prefix="/api/memories", tags=["memories"])
 app.include_router(reminders.router, prefix="/api/reminders", tags=["reminders"])
 app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
+app.include_router(lark.router, prefix="/api/lark", tags=["lark"])
 
 # 注册其他路由
 @app.get("/health")

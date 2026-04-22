@@ -53,13 +53,13 @@ class QueueService:
         
         try:
             from services.ai_service import ai_service
-            from services.wechat_service import wechat_service
+            from services.lark_bot_service import lark_bot_service
             
             # 获取AI回答
             answer = await ai_service.get_ai_answer(question, user_id)
             
-            # 发送回答
-            await wechat_service.send_message(answer, to=user_id)
+            # 发送回答 - 使用飞书机器人
+            await lark_bot_service.send_message(user_id, answer)
             
             logger.info(f"AI请求处理完成: {question[:50]}...")
         except Exception as e:
