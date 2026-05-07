@@ -8,7 +8,7 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from api import admin, pushes, crawlers, memories, reminders, finance, logs, lark
+from api import admin, pushes, crawlers, memories, reminders, finance, logs, chat
 from services.scheduler import scheduler
 from models import db
 
@@ -34,16 +34,16 @@ async def lifespan(app: FastAPI):
         logger.info("正在初始化数据库...")
         db.init_db()
         logger.info("数据库初始化完成")
-        
+
         logger.info("正在启动调度器...")
         scheduler.start()
         logger.info("调度器启动完成")
-        
+
         logger.info("正在启动队列服务...")
         from services.queue_service import queue_service
         await queue_service.start_worker()
         logger.info("队列服务启动完成")
-        
+
         # 启动AI服务的清理任务
         try:
             from services.ai_service import start_cleanup_task
@@ -51,26 +51,9 @@ async def lifespan(app: FastAPI):
             logger.info("AI服务清理任务启动完成")
         except Exception as e:
             logger.warning(f"启动AI服务清理任务失败: {e}")
-        
-        # 启动飞书机器人
-        try:
-            from services.lark_bot_service import start_bot
-            if await start_bot():
-                logger.info("飞书机器人启动成功")
-            else:
-                logger.warning("飞书机器人启动失败")
-        except Exception as e:
-            logger.warning(f"启动飞书机器人失败: {e}")
-        
-        # 启动时检查更新（已禁用以避免服务中断）
-        # try:
-        #     from update import check_update_on_start
-        #     await check_update_on_start()
-        # except Exception as e:
-        #     logger.warning(f"启动时检查更新失败: {e}")
-        
+
         yield
-        
+
         # 关闭时执行
         logger.info("正在停止调度器...")
         scheduler.stop()
@@ -113,7 +96,7 @@ app.include_router(memories.router, prefix="/api/memories", tags=["memories"])
 app.include_router(reminders.router, prefix="/api/reminders", tags=["reminders"])
 app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
-app.include_router(lark.router, prefix="/api/lark", tags=["lark"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 # 注册其他路由
 @app.get("/health")
@@ -127,21 +110,21 @@ async def dashboard_stats():
     """仪表盘统计数据"""
     from datetime import datetime
     from models.db import SessionLocal, PushContent, MessageLog
-    
+
     session = SessionLocal()
     try:
         today = datetime.now().strftime("%Y-%m-%d")
-        
+
         # 统计今日推送数
         today_pushes = session.query(PushContent).filter(
             PushContent.created_at >= today
         ).count()
-        
+
         # 统计今日消息数
         message_stats = session.query(MessageLog).filter(
             MessageLog.created_at >= today
         ).count()
-        
+
         return {
             "today_pushes": today_pushes,
             "message_stats": message_stats,
@@ -162,16 +145,31 @@ app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 
 if __name__ == "__main__":
-    try:
-        logger.info("正在启动企业微信机器人API服务...")
-        uvicorn.run(
-            "main:app", 
-            host="0.0.0.0", 
-            port=8000, 
-            reload=False,
-            log_config=None  # 使用自定义日志配置
-        )
-    except Exception as e:
-        logger.error(f"服务启动失败: {e}")
-        raise
+    import time
+    max_retries = 0  # 0表示无限重试
+    retry_count = 0
+    retry_delay = 5  # 重启延迟（秒）
 
+    logger.info("自动小助手服务启动中...")
+
+    while True:
+        try:
+            logger.info(f"正在启动服务... (重试次数: {retry_count})")
+            uvicorn.run(
+                "main:app",
+                host="0.0.0.0",
+                port=8080,
+                reload=False,
+                log_config=None
+            )
+        except KeyboardInterrupt:
+            logger.info("收到停止信号，服务正在关闭...")
+            break
+        except Exception as e:
+            retry_count += 1
+            logger.error(f"服务异常退出: {e}")
+            if max_retries > 0 and retry_count >= max_retries:
+                logger.error(f"已达到最大重试次数 ({max_retries})，退出程序")
+                break
+            logger.info(f"{retry_delay}秒后自动重启...")
+            time.sleep(retry_delay)

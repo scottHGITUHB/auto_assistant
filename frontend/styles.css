@@ -174,6 +174,262 @@ tr:hover {
     border-radius: 8px;
 }
 
+/* 理财报表样式 */
+.finance-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.overview-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.overview-card.income-bg {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.overview-card.expense-bg {
+    background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+}
+
+.overview-card.balance-bg {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.overview-card .overview-label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.overview-card .overview-value {
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.finance-filter {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    align-items: center;
+}
+
+.finance-filter select {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: white;
+}
+
+.finance-filter button {
+    padding: 10px 20px;
+    margin: 0;
+}
+
+.finance-report {
+    background-color: #f9f9f9;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.finance-report h3 {
+    color: #333;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #4CAF50;
+}
+
+.report-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.report-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-left: 4px solid #ddd;
+}
+
+.report-card.income {
+    border-left-color: #11998e;
+}
+
+.report-card.expense {
+    border-left-color: #fc4a1a;
+}
+
+.report-card.balance {
+    border-left-color: #4facfe;
+}
+
+.report-card.savings {
+    border-left-color: #f093fb;
+}
+
+.report-card .report-label {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.report-card .report-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+}
+
+.report-card.income .report-value {
+    color: #11998e;
+}
+
+.report-card.expense .report-value {
+    color: #fc4a1a;
+}
+
+.budget-bar-container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.budget-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.budget-bar {
+    width: 100%;
+    height: 24px;
+    background-color: #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.budget-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 12px;
+    transition: width 0.5s ease;
+}
+
+.budget-progress.warning {
+    background: linear-gradient(90deg, #f7b733 0%, #fc4a1a 100%);
+}
+
+.budget-progress.danger {
+    background: linear-gradient(90deg, #fc4a1a 0%, #ff0000 100%);
+}
+
+.budget-text {
+    font-size: 13px;
+    color: #666;
+    text-align: right;
+}
+
+.category-breakdown {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.category-breakdown h4 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.category-name {
+    width: 80px;
+    font-size: 14px;
+    color: #555;
+}
+
+.category-bar-wrapper {
+    flex: 1;
+    height: 20px;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0 10px;
+}
+
+.category-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    transition: width 0.5s ease;
+}
+
+.category-amount {
+    width: 80px;
+    text-align: right;
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+}
+
+.category-percent {
+    width: 50px;
+    text-align: right;
+    font-size: 12px;
+    color: #999;
+}
+
+.monthly-trend {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.monthly-trend h4 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.monthly-trend table {
+    width: 100%;
+}
+
+.monthly-trend th {
+    background-color: #f8f8f8;
+    font-weight: 600;
+}
+
+.trend-positive {
+    color: #11998e;
+    font-weight: 500;
+}
+
+.trend-negative {
+    color: #fc4a1a;
+    font-weight: 500;
+}
+
 .log-filters {
     display: flex;
     gap: 10px;
@@ -288,4 +544,321 @@ tr:hover {
     border-top: 1px dashed #ddd;
     font-style: italic;
     color: #555;
+}
+
+/* 记忆管理样式 */
+.memory-entry {
+    margin-bottom: 15px;
+    padding: 12px;
+    border-left: 4px solid #FF9800;
+    background-color: #fff8f0;
+    border-radius: 4px;
+}
+
+.memory-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.memory-time {
+    font-weight: bold;
+    color: #FF9800;
+}
+
+.memory-category {
+    background-color: #FF9800;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+}
+
+.memory-content {
+    margin: 8px 0;
+    line-height: 1.5;
+    font-size: 14px;
+    color: #333;
+}
+
+.memory-actions {
+    text-align: right;
+    margin-top: 8px;
+}
+
+.memory-actions .delete-btn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.memory-actions .delete-btn:hover {
+    background-color: #d32f2f;
+}
+
+/* WeChat-style Chat UI */
+.chat-container {
+    display: flex;
+    height: 600px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #f5f5f5;
+}
+
+.chat-sidebar {
+    width: 280px;
+    background-color: #ece5d8;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-sidebar-header {
+    padding: 15px;
+    background-color: #ededed;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
+    color: #333;
+}
+
+.chat-conversation-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.conversation-item {
+    display: flex;
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #e5e5e5;
+    transition: background-color 0.2s;
+}
+
+.conversation-item:hover {
+    background-color: #e5e5e5;
+}
+
+.conversation-item.active {
+    background-color: #dadada;
+}
+
+.conversation-avatar {
+    width: 40px;
+    height: 40px;
+    background-color: #07c160;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.conversation-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.conversation-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.conversation-preview {
+    font-size: 12px;
+    color: #999;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+}
+
+.chat-header {
+    padding: 12px 20px;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+}
+
+.chat-header-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chat-header-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.chat-header-status {
+    font-size: 12px;
+    color: #07c160;
+    background-color: #e8f8ed;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.message {
+    display: flex;
+    align-items: flex-start;
+    max-width: 70%;
+}
+
+.message.sent {
+    flex-direction: row-reverse;
+    align-self: flex-end;
+}
+
+.message.received {
+    align-self: flex-start;
+}
+
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    background-color: #07c160;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.message.sent .message-avatar {
+    background-color: #07c160;
+}
+
+.message.received .message-avatar {
+    background-color: #07c160;
+}
+
+.message-content {
+    margin: 0 8px;
+}
+
+.message-text {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.message.sent .message-text {
+    background-color: #07c160;
+    color: #fff;
+    border-top-right-radius: 4px;
+}
+
+.message.received .message-text {
+    background-color: #f0f0f0;
+    color: #333;
+    border-top-left-radius: 4px;
+}
+
+.message-time {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+    text-align: right;
+}
+
+.message.received .message-time {
+    text-align: left;
+}
+
+.message.typing .message-text {
+    background-color: #f0f0f0;
+    padding: 12px 16px;
+}
+
+.message.typing .message-text::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background-color: #999;
+    border-radius: 50%;
+    margin-left: 4px;
+    animation: typing-bounce 1.4s infinite ease-in-out;
+}
+
+@keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+}
+
+.chat-input-area {
+    padding: 12px 20px;
+    background-color: #f8f8f8;
+    border-top: 1px solid #ddd;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.chat-input-area textarea {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    resize: none;
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.4;
+    max-height: 100px;
+    overflow-y: auto;
+    outline: none;
+}
+
+.chat-input-area textarea:focus {
+    border-color: #07c160;
+}
+
+.chat-input-area button {
+    padding: 10px 24px;
+    background-color: #07c160;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.chat-input-area button:hover {
+    background-color: #06ad56;
+}
+
+.chat-input-area button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
 }

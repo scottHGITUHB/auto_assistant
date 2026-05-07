@@ -5,13 +5,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    # 企业微信配置
-    WECHAT_CORPID = os.getenv("WECHAT_CORPID")
-    WECHAT_SECRET = os.getenv("WECHAT_SECRET")
-    WECHAT_AGENTID = os.getenv("WECHAT_AGENTID")
-    WECHAT_WEBHOOK_KEY = os.getenv("WECHAT_WEBHOOK_KEY")
-    WECHAT_TOKEN = os.getenv("WECHAT_TOKEN")
-    WECHAT_ENCODING_AES_KEY = os.getenv("WECHAT_ENCODING_AES_KEY")
+    # SMTP邮箱配置
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_TO = os.getenv("SMTP_TO", "")
     
     # 管理端配置
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>企业微信机器人管理系统</title>
+    <title>智能助理</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,6 +15,7 @@
         <nav>
             <ul>
                 <li><a href="#dashboard">仪表盘</a></li>
+                <li><a href="#chat">AI聊天</a></li>
                 <li><a href="#pushes">推送管理</a></li>
                 <li><a href="#crawlers">爬虫管理</a></li>
                 <li><a href="#memories">记忆管理</a></li>
@@ -44,7 +45,48 @@
                     </div>
                 </div>
             </section>
-            
+
+            <section id="chat" style="display: none;">
+                <h2>AI聊天</h2>
+                <div class="chat-container">
+                    <div class="chat-sidebar">
+                        <div class="chat-sidebar-header">
+                            <span>会话列表</span>
+                        </div>
+                        <div class="chat-conversation-list" id="conversation-list">
+                            <div class="conversation-item active" data-session-id="default">
+                                <div class="conversation-avatar">🤖</div>
+                                <div class="conversation-info">
+                                    <div class="conversation-name">AI助手</div>
+                                    <div class="conversation-preview">点击开始对话</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-main">
+                        <div class="chat-header">
+                            <div class="chat-header-info">
+                                <span class="chat-header-name">AI助手</span>
+                                <span class="chat-header-status">在线</span>
+                            </div>
+                        </div>
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="message received">
+                                <div class="message-avatar">🤖</div>
+                                <div class="message-content">
+                                    <div class="message-text">你好！我是 AI助手，有什么我可以帮助你的吗？</div>
+                                    <div class="message-time" id="bot-welcome-time"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <textarea id="chat-input" placeholder="输入消息..." rows="1"></textarea>
+                            <button id="send-btn">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="pushes" style="display: none;">
                 <h2>推送管理</h2>
                 <button id="add-push">添加推送</button>
@@ -88,21 +130,9 @@
             
             <section id="memories" style="display: none;">
                 <h2>记忆管理</h2>
-                <table id="memories-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>用户ID</th>
-                            <th>内容</th>
-                            <th>分类</th>
-                            <th>创建时间</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- 数据将通过JavaScript动态填充 -->
-                    </tbody>
-                </table>
+                <div id="memories-container">
+                    <!-- 按天分组的记忆将通过JavaScript动态填充 -->
+                </div>
             </section>
             
             <section id="reminders" style="display: none;">
@@ -126,15 +156,124 @@
             
             <section id="finance" style="display: none;">
                 <h2>理财记录</h2>
+
+                <!-- 年度概览卡片 -->
+                <div class="finance-overview" id="finance-overview">
+                    <!-- 动态填充年度概览 -->
+                </div>
+
+                <!-- 年月选择器 -->
+                <div class="finance-filter">
+                    <select id="finance-year-select">
+                        <option value="">选择年份</option>
+                    </select>
+                    <select id="finance-month-select">
+                        <option value="">选择月份</option>
+                    </select>
+                    <button id="finance-filter-btn">查看报表</button>
+                    <button id="finance-all-btn">查看全部</button>
+                </div>
+
+                <!-- 月度统计报表 -->
+                <div class="finance-report" id="finance-monthly-report">
+                    <h3>月度统计报表</h3>
+                    <div class="report-cards">
+                        <div class="report-card income">
+                            <div class="report-label">本月收入</div>
+                            <div class="report-value" id="month-income">0元</div>
+                        </div>
+                        <div class="report-card expense">
+                            <div class="report-label">本月支出</div>
+                            <div class="report-value" id="month-expense">0元</div>
+                        </div>
+                        <div class="report-card balance">
+                            <div class="report-label">本月结余</div>
+                            <div class="report-value" id="month-balance">0元</div>
+                        </div>
+                        <div class="report-card savings">
+                            <div class="report-label">储蓄率</div>
+                            <div class="report-value" id="month-savings-rate">0%</div>
+                        </div>
+                    </div>
+
+                    <!-- 预算进度条 -->
+                    <div class="budget-bar-container" id="budget-container">
+                        <div class="budget-label">预算使用情况 (建议为收入的80%)</div>
+                        <div class="budget-bar">
+                            <div class="budget-progress" id="budget-progress"></div>
+                        </div>
+                        <div class="budget-text" id="budget-text">0 / 0元</div>
+                    </div>
+
+                    <!-- 分类支出 -->
+                    <div class="category-breakdown">
+                        <h4>支出分类</h4>
+                        <div id="category-list">
+                            <!-- 动态填充 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 年度统计报表 -->
+                <div class="finance-report" id="finance-yearly-report">
+                    <h3>年度统计报表</h3>
+                    <div class="report-cards">
+                        <div class="report-card income">
+                            <div class="report-label">年度收入</div>
+                            <div class="report-value" id="year-income">0元</div>
+                        </div>
+                        <div class="report-card expense">
+                            <div class="report-label">年度支出</div>
+                            <div class="report-value" id="year-expense">0元</div>
+                        </div>
+                        <div class="report-card balance">
+                            <div class="report-label">年度结余</div>
+                            <div class="report-value" id="year-balance">0元</div>
+                        </div>
+                        <div class="report-card savings">
+                            <div class="report-label">年储蓄率</div>
+                            <div class="report-value" id="year-savings-rate">0%</div>
+                        </div>
+                    </div>
+
+                    <!-- 月度趋势表格 -->
+                    <div class="monthly-trend">
+                        <h4>月度收支趋势</h4>
+                        <table id="monthly-trend-table">
+                            <thead>
+                                <tr>
+                                    <th>月份</th>
+                                    <th>收入</th>
+                                    <th>支出</th>
+                                    <th>结余</th>
+                                    <th>储蓄率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 动态填充 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 年度分类支出 -->
+                    <div class="category-breakdown">
+                        <h4>年度支出分类排行</h4>
+                        <div id="yearly-category-list">
+                            <!-- 动态填充 -->
+                        </div>
+                    </div>
+                </div>
+
+                <h3>详细记录</h3>
                 <button id="add-finance">添加记录</button>
                 <table id="finance-table">
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>用户ID</th>
                             <th>类型</th>
                             <th>金额</th>
                             <th>分类</th>
+                            <th>备注</th>
                             <th>记录日期</th>
                             <th>操作</th>
                         </tr>
@@ -143,10 +282,6 @@
                         <!-- 数据将通过JavaScript动态填充 -->
                     </tbody>
                 </table>
-                <h3>统计报表</h3>
-                <div id="finance-stats">
-                    <!-- 统计数据将通过JavaScript动态填充 -->
-                </div>
             </section>
 
             <section id="kimi-logs" style="display: none;">
@@ -187,21 +322,26 @@
             <section id="settings" style="display: none;">
                 <h2>配置中心</h2>
                 <form id="settings-form">
+                    <h3>SMTP邮箱配置</h3>
                     <div class="form-group">
-                        <label>企业微信 CorpID</label>
-                        <input type="text" id="wechat-corpid" placeholder="请输入 CorpID">
+                        <label>SMTP服务器地址</label>
+                        <input type="text" id="smtp-host" placeholder="例如: smtp.qq.com">
                     </div>
                     <div class="form-group">
-                        <label>企业微信 Secret</label>
-                        <input type="text" id="wechat-secret" placeholder="请输入 Secret">
+                        <label>SMTP端口</label>
+                        <input type="number" id="smtp-port" placeholder="例如: 587">
                     </div>
                     <div class="form-group">
-                        <label>企业微信 AgentID</label>
-                        <input type="text" id="wechat-agentid" placeholder="请输入 AgentID">
+                        <label>发件人邮箱</label>
+                        <input type="email" id="smtp-user" placeholder="请输入邮箱地址">
                     </div>
                     <div class="form-group">
-                        <label>企业微信 Webhook Key</label>
-                        <input type="text" id="wechat-webhook-key" placeholder="请输入 Webhook Key">
+                        <label>邮箱密码/授权码</label>
+                        <input type="password" id="smtp-password" placeholder="请输入密码或授权码">
+                    </div>
+                    <div class="form-group">
+                        <label>收件人邮箱</label>
+                        <input type="email" id="smtp-to" placeholder="请输入收件人邮箱">
                     </div>
                     <button type="submit">保存配置</button>
                 </form>

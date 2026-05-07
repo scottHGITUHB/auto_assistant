@@ -28,11 +28,15 @@ class QueueService:
         while True:
             try:
                 task = await self.task_queue.get()
-                await self.handle_task(task)
+                try:
+                    await self.handle_task(task)
+                finally:
+                    self.task_queue.task_done()
+            except asyncio.CancelledError:
+                # 当任务被取消时，不调用task_done()
+                break
             except Exception as e:
                 logger.error(f"处理任务失败: {e}")
-            finally:
-                self.task_queue.task_done()
     
     async def handle_task(self, task):
         """处理具体任务"""
@@ -53,15 +57,11 @@ class QueueService:
         
         try:
             from services.ai_service import ai_service
-            from services.lark_bot_service import lark_bot_service
             
-            # 获取AI回答
             answer = await ai_service.get_ai_answer(question, user_id)
             
-            # 发送回答 - 使用飞书机器人
-            await lark_bot_service.send_message(user_id, answer)
-            
             logger.info(f"AI请求处理完成: {question[:50]}...")
+            logger.info(f"AI回答: {answer[:100]}...")
         except Exception as e:
             logger.error(f"处理AI请求失败: {e}")
     

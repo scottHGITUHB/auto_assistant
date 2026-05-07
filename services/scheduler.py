@@ -15,12 +15,14 @@ class Scheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
         self.lock_file = "/tmp/auto_assistant_scheduler.lock"
+        self.is_running = False
     
     def start(self):
         # 启动前检查是否有其他实例在运行
         if self._acquire_lock():
             try:
                 self.scheduler.start()
+                self.is_running = True
                 # 执行异步的schedule_all_tasks
                 import asyncio
                 asyncio.create_task(self.schedule_all_tasks())
@@ -33,8 +35,12 @@ class Scheduler:
     
     def stop(self):
         try:
-            self.scheduler.shutdown()
-            logger.info("调度器停止成功")
+            if self.is_running:
+                self.scheduler.shutdown()
+                self.is_running = False
+                logger.info("调度器停止成功")
+            else:
+                logger.info("调度器未运行，跳过停止")
         finally:
             self._release_lock()
     
@@ -218,16 +224,12 @@ class Scheduler:
     
     async def send_reminder(self, reminder):
         try:
-            from .lark_bot_service import lark_bot_service
-            
             message = f"提醒: {reminder.content}"
-            await lark_bot_service.send_message(reminder.user_id, message)
+            logger.info(f"发送提醒: {message} 到用户 {reminder.user_id}")
             
-            # 在新会话中更新状态
             from models.db import SessionLocal, Reminder
             session = SessionLocal()
             try:
-                # 重新加载对象
                 reminder_db = session.query(Reminder).filter_by(id=reminder.id).first()
                 if reminder_db:
                     reminder_db.is_done = True
@@ -235,16 +237,14 @@ class Scheduler:
             finally:
                 session.close()
             
-            logger.info(f"发送提醒成功: {reminder.content}")
+            logger.info(f"提醒处理完成: {reminder.content}")
         except Exception as e:
             logger.error(f"发送提醒失败: {e}")
     
     async def send_push(self, push_content):
         try:
-            from .lark_bot_service import lark_bot_service
-            
-            await lark_bot_service.send_message(push_content.target_group, push_content.content)
-            logger.info(f"发送推送成功: {push_content.title}")
+            logger.info(f"发送推送: {push_content.title} 到 {push_content.target_group}")
+            logger.info(f"推送内容: {push_content.content}")
         except Exception as e:
             logger.error(f"发送推送失败: {e}")
     
@@ -257,4 +257,3 @@ class Scheduler:
             logger.error(f"检查更新失败: {e}")
 
 scheduler = Scheduler()
-

@@ -1,5 +1,5 @@
 // API基础URL
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = '/api';
 
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初始化配置中心
     initSettings();
+
+    // 初始化聊天功能
+    initChat();
 });
 
 // 初始化导航
@@ -52,6 +55,11 @@ function initNavigation() {
             
             // 显示目标 section
             document.getElementById(targetId).style.display = 'block';
+            
+            // 如果切换到KimiAI日志页面，刷新日志
+            if (targetId === 'kimi-logs') {
+                initKimiLogs();
+            }
         });
     });
 }
@@ -207,48 +215,102 @@ async function initMemories() {
         const response = await fetch(`${API_BASE}/memories`);
         if (response.ok) {
             const memories = await response.json();
-            const tableBody = document.querySelector('#memories-table tbody');
-            tableBody.innerHTML = '';
+            const container = document.getElementById('memories-container');
+            container.innerHTML = '';
             
+            if (memories.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">暂无记忆记录</div>';
+                return;
+            }
+            
+            // 按日期分组
+            const memoriesByDay = {};
             memories.forEach(memory => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${memory.id}</td>
-                    <td>${memory.user_id}</td>
-                    <td>${memory.content}</td>
-                    <td>${memory.category}</td>
-                    <td>${memory.created_at}</td>
-                    <td class="action-buttons">
-                        <button class="delete">删除</button>
-                    </td>
+                const date = new Date(memory.created_at);
+                const dateStr = date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+                if (!memoriesByDay[dateStr]) {
+                    memoriesByDay[dateStr] = [];
+                }
+                memoriesByDay[dateStr].push(memory);
+            });
+            
+            // 按日期倒序排序
+            const sortedDates = Object.keys(memoriesByDay).sort((a, b) => {
+                return new Date(b) - new Date(a);
+            });
+            
+            // 为每个日期创建分组
+            sortedDates.forEach(date => {
+                const dayMemories = memoriesByDay[date];
+                const dayGroup = document.createElement('div');
+                dayGroup.className = 'day-group';
+                
+                // 日期头部
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                dayHeader.innerHTML = `
+                    <span class="day-date">${date}</span>
+                    <span class="day-count">${dayMemories.length} 条记忆</span>
                 `;
-                tableBody.appendChild(row);
+                
+                // 日期内容
+                const dayContent = document.createElement('div');
+                dayContent.className = 'day-content expanded';
+                
+                // 为每条记忆创建条目
+                dayMemories.forEach(memory => {
+                    const memoryEntry = document.createElement('div');
+                    memoryEntry.className = 'memory-entry';
+                    memoryEntry.innerHTML = `
+                        <div class="memory-meta">
+                            <span class="memory-time">${new Date(memory.created_at).toLocaleTimeString('zh-CN')}</span>
+                            <span class="memory-category">${memory.category}</span>
+                        </div>
+                        <div class="memory-content">${memory.content}</div>
+                        <div class="memory-actions">
+                            <button class="delete-btn" data-id="${memory.id}">删除</button>
+                        </div>
+                    `;
+                    dayContent.appendChild(memoryEntry);
+                });
+                
+                // 点击头部展开/折叠
+                dayHeader.addEventListener('click', function() {
+                    dayContent.classList.toggle('expanded');
+                });
+                
+                dayGroup.appendChild(dayHeader);
+                dayGroup.appendChild(dayContent);
+                container.appendChild(dayGroup);
+            });
+            
+            // 添加删除事件监听
+            container.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const memoryId = this.getAttribute('data-id');
+                    if (confirm('确定要删除这条记忆吗？')) {
+                        try {
+                            const response = await fetch(`${API_BASE}/memories/${memoryId}`, {
+                                method: 'DELETE'
+                            });
+                            if (response.ok) {
+                                initMemories(); // 刷新列表
+                            }
+                        } catch (error) {
+                            console.error('删除记忆失败:', error);
+                        }
+                    }
+                });
             });
         }
     } catch (error) {
         console.error('获取记忆数据失败:', error);
-        // 使用模拟数据
-        const memories = [
-            { id: 1, user_id: 'user1', content: '明天开会', category: '工作', created_at: '2024-01-01 10:00:00' },
-            { id: 2, user_id: 'user1', content: '买牛奶', category: '生活', created_at: '2024-01-02 15:00:00' },
-            { id: 3, user_id: 'user2', content: '项目 deadline', category: '工作', created_at: '2024-01-03 09:00:00' }
-        ];
-        const tableBody = document.querySelector('#memories-table tbody');
-        tableBody.innerHTML = '';
-        memories.forEach(memory => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${memory.id}</td>
-                <td>${memory.user_id}</td>
-                <td>${memory.content}</td>
-                <td>${memory.category}</td>
-                <td>${memory.created_at}</td>
-                <td class="action-buttons">
-                    <button class="delete">删除</button>
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
+        const container = document.getElementById('memories-container');
+        container.innerHTML = '<div style="text-align: center; color: red; padding: 20px;">获取记忆数据失败，请刷新页面重试</div>';
     }
 }
 
@@ -305,6 +367,10 @@ async function initReminders() {
     }
 }
 
+// 全局变量存储理财数据
+let financeMonthlyData = {};
+let financeYearlyData = {};
+
 // 初始化理财记录
 async function initFinance() {
     try {
@@ -312,175 +378,350 @@ async function initFinance() {
         const recordsResponse = await fetch(`${API_BASE}/finance`);
         if (recordsResponse.ok) {
             const records = await recordsResponse.json();
-            const tableBody = document.querySelector('#finance-table tbody');
-            tableBody.innerHTML = '';
-            
-            records.forEach(record => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${record.id}</td>
-                    <td>${record.user_id}</td>
-                    <td>${record.type === 'income' ? '收入' : '支出'}</td>
-                    <td>${record.amount}</td>
-                    <td>${record.category}</td>
-                    <td>${record.record_date}</td>
-                    <td class="action-buttons">
-                        <button class="edit">编辑</button>
-                        <button class="delete">删除</button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
+            renderFinanceTable(records);
         }
-        
-        // 获取理财统计
-        const statsResponse = await fetch(`${API_BASE}/finance/stats`);
-        if (statsResponse.ok) {
-            const stats = await statsResponse.json();
-            const statsDiv = document.getElementById('finance-stats');
-            statsDiv.innerHTML = `
-                <p>总收入: ${stats.total_income || 0}元</p>
-                <p>总支出: ${stats.total_expense || 0}元</p>
-                <p>结余: ${stats.balance || 0}元</p>
-                <p>餐饮支出: ${stats.category_expenses?.餐饮 || 0}元</p>
-                <p>交通支出: ${stats.category_expenses?.交通 || 0}元</p>
-            `;
+
+        // 获取月度统计
+        const monthlyResponse = await fetch(`${API_BASE}/finance/monthly-stats`);
+        if (monthlyResponse.ok) {
+            const data = await monthlyResponse.json();
+            financeMonthlyData = data.monthly || {};
+            financeYearlyData = data.yearly || {};
+
+            // 初始化年份选择器
+            initYearMonthSelectors(data.yearly || {});
+
+            // 渲染年度概览
+            renderFinanceOverview(data.yearly || {});
+
+            // 默认显示当前月份
+            const currentMonth = data.current_month || new Date().toISOString().slice(0, 7);
+            renderMonthlyReport(currentMonth);
+
+            // 默认显示当前年份
+            const currentYear = data.current_year || new Date().getFullYear().toString();
+            renderYearlyReport(currentYear);
         }
     } catch (error) {
         console.error('获取理财数据失败:', error);
-        // 使用模拟数据
-        const records = [
-            { id: 1, user_id: 'user1', type: 'income', amount: 10000, category: '工资', record_date: '2024-01-01' },
-            { id: 2, user_id: 'user1', type: 'expense', amount: 500, category: '餐饮', record_date: '2024-01-02' },
-            { id: 3, user_id: 'user1', type: 'expense', amount: 200, category: '交通', record_date: '2024-01-03' }
-        ];
-        const tableBody = document.querySelector('#finance-table tbody');
-        tableBody.innerHTML = '';
-        records.forEach(record => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${record.id}</td>
-                <td>${record.user_id}</td>
-                <td>${record.type === 'income' ? '收入' : '支出'}</td>
-                <td>${record.amount}</td>
-                <td>${record.category}</td>
-                <td>${record.record_date}</td>
-                <td class="action-buttons">
-                    <button class="edit">编辑</button>
-                    <button class="delete">删除</button>
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
-        
-        // 模拟统计数据
-        const statsDiv = document.getElementById('finance-stats');
-        statsDiv.innerHTML = `
-            <p>总收入: 10000元</p>
-            <p>总支出: 700元</p>
-            <p>结余: 9300元</p>
-            <p>餐饮支出: 500元</p>
-            <p>交通支出: 200元</p>
-        `;
     }
-    
+
     // 添加记录按钮点击事件
     document.getElementById('add-finance').addEventListener('click', function() {
         alert('添加理财记录功能开发中...');
+    });
+
+    // 筛选按钮事件
+    document.getElementById('finance-filter-btn').addEventListener('click', function() {
+        const year = document.getElementById('finance-year-select').value;
+        const month = document.getElementById('finance-month-select').value;
+
+        if (year) {
+            renderYearlyReport(year);
+        }
+        if (month) {
+            renderMonthlyReport(month);
+        }
+    });
+
+    // 查看全部按钮
+    document.getElementById('finance-all-btn').addEventListener('click', function() {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const currentYear = new Date().getFullYear().toString();
+        renderMonthlyReport(currentMonth);
+        renderYearlyReport(currentYear);
+    });
+}
+
+// 渲染理财记录表格
+function renderFinanceTable(records) {
+    const tableBody = document.querySelector('#finance-table tbody');
+    tableBody.innerHTML = '';
+
+    if (records.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">暂无记录</td></tr>';
+        return;
+    }
+
+    records.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${record.id}</td>
+            <td><span class="badge ${record.type === 'income' ? 'income-badge' : 'expense-badge'}">${record.type === 'income' ? '收入' : '支出'}</span></td>
+            <td>${record.amount.toFixed(2)}</td>
+            <td>${record.category}</td>
+            <td>${record.note || '-'}</td>
+            <td>${record.record_date}</td>
+            <td class="action-buttons">
+                <button class="edit">编辑</button>
+                <button class="delete">删除</button>
+            </td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+// 初始化年月选择器
+function initYearMonthSelectors(yearlyData) {
+    const yearSelect = document.getElementById('finance-year-select');
+    const monthSelect = document.getElementById('finance-month-select');
+
+    // 清空并添加年份选项
+    yearSelect.innerHTML = '<option value="">选择年份</option>';
+    Object.keys(yearlyData).sort((a, b) => b - a).forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year + '年';
+        yearSelect.appendChild(option);
+    });
+
+    // 添加月份选项
+    monthSelect.innerHTML = '<option value="">选择月份</option>';
+    for (let i = 1; i <= 12; i++) {
+        const month = i.toString().padStart(2, '0');
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = month + '月';
+        monthSelect.appendChild(option);
+    }
+}
+
+// 渲染年度概览卡片
+function renderFinanceOverview(yearlyData) {
+    const container = document.getElementById('finance-overview');
+    container.innerHTML = '';
+
+    const years = Object.keys(yearlyData).sort((a, b) => b - a);
+    if (years.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无理财数据</div>';
+        return;
+    }
+
+    years.forEach(year => {
+        const data = yearlyData[year];
+        const card = document.createElement('div');
+        card.className = 'overview-card';
+        card.innerHTML = `
+            <div class="overview-label">${year}年结余</div>
+            <div class="overview-value">${data.balance.toFixed(2)}元</div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+// 渲染月度报表
+function renderMonthlyReport(yearMonth) {
+    const data = financeMonthlyData[yearMonth];
+    if (!data) {
+        // 清空显示
+        document.getElementById('month-income').textContent = '0元';
+        document.getElementById('month-expense').textContent = '0元';
+        document.getElementById('month-balance').textContent = '0元';
+        document.getElementById('month-savings-rate').textContent = '0%';
+        document.getElementById('category-list').innerHTML = '<div style="color: #999;">该月份暂无数据</div>';
+        return;
+    }
+
+    // 更新卡片数据
+    document.getElementById('month-income').textContent = data.income.toFixed(2) + '元';
+    document.getElementById('month-expense').textContent = data.expense.toFixed(2) + '元';
+    document.getElementById('month-balance').textContent = data.balance.toFixed(2) + '元';
+    document.getElementById('month-savings-rate').textContent = data.savings_rate.toFixed(1) + '%';
+
+    // 更新预算进度条
+    const budgetProgress = document.getElementById('budget-progress');
+    const budgetText = document.getElementById('budget-text');
+    const budgetPercent = data.budget > 0 ? (data.expense / data.budget * 100) : 0;
+
+    budgetProgress.style.width = Math.min(budgetPercent, 100) + '%';
+    budgetText.textContent = `${data.expense.toFixed(2)} / ${data.budget.toFixed(2)}元`;
+
+    // 设置进度条颜色
+    budgetProgress.className = 'budget-progress';
+    if (budgetPercent > 100) {
+        budgetProgress.classList.add('danger');
+    } else if (budgetPercent > 80) {
+        budgetProgress.classList.add('warning');
+    }
+
+    // 渲染分类支出
+    renderCategoryList('category-list', data.categories || {}, data.expense);
+}
+
+// 渲染年度报表
+async function renderYearlyReport(year) {
+    try {
+        const response = await fetch(`${API_BASE}/finance/yearly-report/${year}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        // 更新年度卡片
+        document.getElementById('year-income').textContent = data.total_income.toFixed(2) + '元';
+        document.getElementById('year-expense').textContent = data.total_expense.toFixed(2) + '元';
+        document.getElementById('year-balance').textContent = data.total_balance.toFixed(2) + '元';
+        document.getElementById('year-savings-rate').textContent = data.savings_rate.toFixed(1) + '%';
+
+        // 渲染月度趋势表格
+        const tbody = document.querySelector('#monthly-trend-table tbody');
+        tbody.innerHTML = '';
+
+        const months = data.months || {};
+        Object.keys(months).sort().forEach(month => {
+            const mData = months[month];
+            const row = document.createElement('tr');
+            const savingsClass = mData.balance >= 0 ? 'trend-positive' : 'trend-negative';
+            row.innerHTML = `
+                <td>${month}月</td>
+                <td>${mData.income.toFixed(2)}</td>
+                <td>${mData.expense.toFixed(2)}</td>
+                <td class="${savingsClass}">${mData.balance.toFixed(2)}</td>
+                <td>${mData.savings_rate.toFixed(1)}%</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        if (Object.keys(months).length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">暂无月度数据</td></tr>';
+        }
+
+        // 渲染年度分类支出
+        renderCategoryList('yearly-category-list', data.category_breakdown || {}, data.total_expense);
+    } catch (error) {
+        console.error('获取年度报表失败:', error);
+    }
+}
+
+// 渲染分类列表
+function renderCategoryList(elementId, categories, totalExpense) {
+    const container = document.getElementById(elementId);
+    container.innerHTML = '';
+
+    const sortedCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+    if (sortedCategories.length === 0) {
+        container.innerHTML = '<div style="color: #999;">暂无分类数据</div>';
+        return;
+    }
+
+    sortedCategories.forEach(([category, amount]) => {
+        const percent = totalExpense > 0 ? (amount / totalExpense * 100) : 0;
+        const item = document.createElement('div');
+        item.className = 'category-item';
+        item.innerHTML = `
+            <div class="category-name">${category}</div>
+            <div class="category-bar-wrapper">
+                <div class="category-bar" style="width: ${percent}%"></div>
+            </div>
+            <div class="category-amount">${amount.toFixed(2)}</div>
+            <div class="category-percent">${percent.toFixed(1)}%</div>
+        `;
+        container.appendChild(item);
     });
 }
 
 // 初始化配置中心
 function initSettings() {
-    // 模拟配置数据
-    document.getElementById('wechat-corpid').value = 'your_corpid';
-    document.getElementById('wechat-secret').value = 'your_secret';
-    document.getElementById('wechat-agentid').value = 'your_agentid';
-    document.getElementById('wechat-webhook-key').value = 'your_webhook_key';
+    // 加载已保存的配置
+    loadSettings();
     
     // 保存配置按钮点击事件
     document.getElementById('settings-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        alert('配置已保存');
+        saveSettings();
     });
+}
+
+// 加载配置
+function loadSettings() {
+    const settings = JSON.parse(localStorage.getItem('smtp_settings') || '{}');
+    document.getElementById('smtp-host').value = settings.host || '';
+    document.getElementById('smtp-port').value = settings.port || '587';
+    document.getElementById('smtp-user').value = settings.user || '';
+    document.getElementById('smtp-password').value = settings.password || '';
+    document.getElementById('smtp-to').value = settings.to || '';
+}
+
+// 保存配置
+function saveSettings() {
+    const settings = {
+        host: document.getElementById('smtp-host').value,
+        port: document.getElementById('smtp-port').value,
+        user: document.getElementById('smtp-user').value,
+        password: document.getElementById('smtp-password').value,
+        to: document.getElementById('smtp-to').value
+    };
+    
+    localStorage.setItem('smtp_settings', JSON.stringify(settings));
+    alert('SMTP配置已保存');
 }
 
 // 初始化KimiAI日志
 async function initKimiLogs() {
     try {
-        const response = await fetch(`${API_BASE}/logs/messages`);
+        const response = await fetch(`${API_BASE}/chat/history`);
         if (response.ok) {
-            const logs = await response.json();
+            const result = await response.json();
             const container = document.getElementById('kimi-logs-container');
             container.innerHTML = '';
 
-            // 按日期分组
-            const logsByDay = {};
-            logs.forEach(log => {
-                const date = new Date(log.created_at);
-                const dateStr = date.toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
+            if (result.code === 200 && result.data) {
+                const logsByDay = result.data;
+                
+                // 按日期倒序排序
+                const sortedDates = Object.keys(logsByDay).sort((a, b) => {
+                    return new Date(b) - new Date(a);
                 });
-                if (!logsByDay[dateStr]) {
-                    logsByDay[dateStr] = [];
+
+                if (sortedDates.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">暂无聊天记录</div>';
+                    return;
                 }
-                logsByDay[dateStr].push(log);
-            });
 
-            // 按日期倒序排序
-            const sortedDates = Object.keys(logsByDay).sort((a, b) => {
-                return new Date(b) - new Date(a);
-            });
+                // 为每个日期创建分组
+                sortedDates.forEach(date => {
+                    const dayLogs = logsByDay[date];
+                    const dayGroup = document.createElement('div');
+                    dayGroup.className = 'day-group';
 
-            // 为每个日期创建分组
-            sortedDates.forEach(date => {
-                const dayLogs = logsByDay[date];
-                const dayGroup = document.createElement('div');
-                dayGroup.className = 'day-group';
-
-                // 日期头部
-                const dayHeader = document.createElement('div');
-                dayHeader.className = 'day-header';
-                dayHeader.innerHTML = `
-                    <span class="day-date">${date}</span>
-                    <span class="day-count">${dayLogs.length} 条消息</span>
-                `;
-
-                // 日期内容
-                const dayContent = document.createElement('div');
-                dayContent.className = 'day-content';
-
-                // 为每条日志创建条目
-                dayLogs.forEach(log => {
-                    const logEntry = document.createElement('div');
-                    const directionClass = log.direction === 'in' ? 'sent' : 'received';
-                    const directionText = log.direction === 'in' ? '发送' : '接收';
-                    const statusText = log.status === 'success' ? '成功' : '失败';
-
-                    logEntry.className = `log-entry ${directionClass}`;
-                    logEntry.innerHTML = `
-                        <div class="log-meta">
-                            <span class="log-direction">${directionText}</span>
-                            <span class="log-time">${formatTime(log.created_at)}</span>
-                            <span class="log-status">${statusText}</span>
-                        </div>
-                        <div class="log-content">${log.content}</div>
-                        ${log.response ? `<div class="log-response">${log.response}</div>` : ''}
+                    // 日期头部
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'day-header';
+                    dayHeader.innerHTML = `
+                        <span class="day-date">${date}</span>
+                        <span class="day-count">${dayLogs.length} 条对话</span>
                     `;
-                    dayContent.appendChild(logEntry);
-                });
 
-                // 点击头部展开/折叠
-                dayHeader.addEventListener('click', function() {
-                    dayContent.classList.toggle('expanded');
-                });
+                    // 日期内容
+                    const dayContent = document.createElement('div');
+                    dayContent.className = 'day-content expanded';
 
-                dayGroup.appendChild(dayHeader);
-                dayGroup.appendChild(dayContent);
-                container.appendChild(dayGroup);
-            });
+                    // 为每条日志创建条目
+                    dayLogs.forEach(log => {
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry';
+                        logEntry.innerHTML = `
+                            <div class="log-meta">
+                                <span class="log-time">${log.timestamp}</span>
+                            </div>
+                            <div class="log-content"><strong>用户:</strong> ${log.user_message}</div>
+                            <div class="log-response"><strong>AI助手:</strong> ${log.ai_response}</div>
+                        `;
+                        dayContent.appendChild(logEntry);
+                    });
+
+                    // 点击头部展开/折叠
+                    dayHeader.addEventListener('click', function() {
+                        dayContent.classList.toggle('expanded');
+                    });
+
+                    dayGroup.appendChild(dayHeader);
+                    dayGroup.appendChild(dayContent);
+                    container.appendChild(dayGroup);
+                });
+            } else {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">暂无聊天记录</div>';
+            }
         }
     } catch (error) {
         console.error('获取KimiAI日志失败:', error);
@@ -544,6 +785,141 @@ async function initSystemLogs() {
     document.getElementById('log-level-filter').addEventListener('change', function() {
         initSystemLogs();
     });
+}
+
+// 初始化聊天功能
+function initChat() {
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatMessages = document.getElementById('chat-messages');
+
+    // 设置欢迎消息时间
+    const welcomeTime = document.getElementById('bot-welcome-time');
+    if (welcomeTime) {
+        welcomeTime.textContent = formatCurrentTime();
+    }
+
+    // 自动调整输入框高度
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+    });
+
+    // 发送按钮点击事件
+    sendBtn.addEventListener('click', sendMessage);
+
+    // 回车发送消息
+    chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    async function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        console.log('准备发送消息:', message);
+
+        // 添加用户消息
+        addMessage(message, 'sent');
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+
+        // 添加机器人正在输入的状态
+        const typingMessage = addTypingIndicator();
+
+        try {
+            console.log('正在调用API:', `${API_BASE}/chat/send`);
+            
+            // 调用API获取AI回复
+            const response = await fetch(`${API_BASE}/chat/send`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message
+                })
+            });
+
+            console.log('API响应状态:', response.status);
+            
+            const data = await response.json();
+            console.log('API响应数据:', data);
+
+            // 移除正在输入的状态
+            removeTypingIndicator(typingMessage);
+
+            if (data.code === 0 || data.code === 200) {
+                console.log('收到AI回复:', data.response);
+                addMessage(data.response || '抱歉，我没有收到有效的回复', 'received');
+            } else {
+                console.error('API返回错误:', data);
+                addMessage('抱歉，发生了错误: ' + (data.msg || data.message || '未知错误'), 'received');
+            }
+        } catch (error) {
+            console.error('发送消息失败:', error);
+            removeTypingIndicator(typingMessage);
+            addMessage('网络错误，请检查网络连接后重试: ' + error.message, 'received');
+        }
+    }
+
+    function addMessage(text, type) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+
+        const avatar = type === 'sent' ? '👤' : '🤖';
+        const time = formatCurrentTime();
+
+        messageDiv.innerHTML = `
+            <div class="message-avatar">${avatar}</div>
+            <div class="message-content">
+                <div class="message-text">${escapeHtml(text)}</div>
+                <div class="message-time">${time}</div>
+            </div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        return messageDiv;
+    }
+
+    function addTypingIndicator() {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message received typing';
+        messageDiv.innerHTML = `
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+                <div class="message-text"></div>
+            </div>
+        `;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return messageDiv;
+    }
+
+    function removeTypingIndicator(element) {
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    }
+
+    function formatCurrentTime() {
+        const now = new Date();
+        return now.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 }
 
 // 删除系统日志
